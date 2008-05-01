@@ -1,0 +1,12 @@
+ampoule is packaged using setuptools and thus can be installed
+by either simply running:
+
+    python setup.py develop
+
+or in the standard python way:
+    
+    python setup.py install
+
+Alternatively use:
+
+    easy_install ampoule

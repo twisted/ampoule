@@ -1,0 +1,12 @@
+
+ampoule - Python process pool for Twisted Matrix
+=================================================
+
+ampoule is a process pool implementation written on top of Twisted
+Matrix. Its name comes from the use of AMP as the default
+communication protocol between the pool and all its children.
+
+It's different from other alternative solutions because it provides an
+API that is very close to the ThreadPool built into Twisted itself. It
+also provides the helper function deferToAMPProcess that is very close
+to deferToThread.
