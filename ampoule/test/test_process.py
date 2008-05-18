@@ -216,14 +216,12 @@ class TestProcessPool(unittest.TestCase):
         pp = pool.ProcessPool()
         self.assertEquals(pp.started, False)
         self.assertEquals(pp.finished, False)
-        self.assertEquals(pp.workers, 0)
-        self.assertEquals(pp.processes, [])
+        self.assertEquals(pp.processes, set())
         self.assertEquals(pp._finishCallbacks, {})
-        
+
         def _checks(_):
             self.assertEquals(pp.started, False)
             self.assertEquals(pp.finished, False)
-            self.assertEquals(pp.workers, 1)
             self.assertEquals(len(pp.processes), 1)
             self.assertEquals(len(pp._finishCallbacks), 1)
             return pp.stopAWorker()
@@ -231,10 +229,9 @@ class TestProcessPool(unittest.TestCase):
         def _closingUp(_):
             self.assertEquals(pp.started, False)
             self.assertEquals(pp.finished, False)
-            self.assertEquals(pp.workers, 0)
             self.assertEquals(len(pp.processes), 0)
             self.assertEquals(pp._finishCallbacks, {})
-        return pp.startAWorker().addCallback(_checks).addCallback(_closingUp)
+        return pp.startAWorker().addCallback(_checks).addCallback(_closingUp).addCallback(lambda _: pp.stop())
 
     def test_startAndStop(self):
         """
@@ -245,14 +242,12 @@ class TestProcessPool(unittest.TestCase):
         pp = pool.ProcessPool()
         self.assertEquals(pp.started, False)
         self.assertEquals(pp.finished, False)
-        self.assertEquals(pp.workers, 0)
-        self.assertEquals(pp.processes, [])
+        self.assertEquals(pp.processes, set())
         self.assertEquals(pp._finishCallbacks, {})
         
         def _checks(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
-            self.assertEquals(pp.workers, pp.min)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             return pp.stop()
@@ -260,7 +255,6 @@ class TestProcessPool(unittest.TestCase):
         def _closingUp(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, True)
-            self.assertEquals(pp.workers, 0)
             self.assertEquals(len(pp.processes), 0)
             self.assertEquals(pp._finishCallbacks, {})
         return pp.start().addCallback(_checks).addCallback(_closingUp)
@@ -272,14 +266,12 @@ class TestProcessPool(unittest.TestCase):
         pp = pool.ProcessPool(min=10)
         self.assertEquals(pp.started, False)
         self.assertEquals(pp.finished, False)
-        self.assertEquals(pp.workers, 0)
-        self.assertEquals(pp.processes, [])
+        self.assertEquals(pp.processes, set())
         self.assertEquals(pp._finishCallbacks, {})
         
         def _resize1(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
-            self.assertEquals(pp.workers, pp.min)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             return pp.adjustPoolSize(min=2, max=3)
@@ -289,7 +281,6 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(pp.finished, False)
             self.assertEquals(pp.max, 3)
             self.assertEquals(pp.min, 2)
-            self.assertEquals(pp.workers, pp.max)
             self.assertEquals(len(pp.processes), pp.max)
             self.assertEquals(len(pp._finishCallbacks), pp.max)
         
@@ -324,7 +315,7 @@ class TestProcessPool(unittest.TestCase):
         
         return pp.start(
             ).addCallback(_checks
-            ).addBoth(lambda _: pp.stop())
+            ).addCallback(lambda _: pp.stop())
 
     def test_parentProtocolChange(self):
         """
@@ -345,7 +336,7 @@ class TestProcessPool(unittest.TestCase):
                             self.assertEquals(response['response'], DATA+APPEND)
                        )
 
-        return pp.start().addCallback(_checks).addBoth(lambda _: pp.stop())
+        return pp.start().addCallback(_checks).addCallback(lambda _: pp.stop())
 
 
     def test_deferToAMPProcess(self):
@@ -354,11 +345,9 @@ class TestProcessPool(unittest.TestCase):
         """
         
         STRING = "CIAOOOO"
-        def _call(_):
-            return pool.deferToAMPProcess(commands.Echo, data=STRING
-               ).addCallback(lambda result: self.assertEquals(result['response'], STRING))
-        
-        return pool.pp.start().addCallback(_call).addCallback(lambda _: pool.pp.stop())
+        return pool.deferToAMPProcess(commands.Echo, data=STRING
+           ).addCallback(lambda result: self.assertEquals(result['response'], STRING)
+           ).addCallback(lambda _: pool.pp.stop())
 
     def test_checkStateInPool(self):
         """
@@ -372,7 +361,6 @@ class TestProcessPool(unittest.TestCase):
             d = pp.doWork(First, data=DATA)
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
-            self.assertEquals(pp.workers, pp.min)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             self.assertEquals(len(pp.ready), pp.min-1)
@@ -384,7 +372,7 @@ class TestProcessPool(unittest.TestCase):
 
         return pp.start(
             ).addCallback(_checks
-            ).addBoth(lambda _: pp.stop())
+            ).addCallback(lambda _: pp.stop())
 
     def test_growingToMax(self):
         """
@@ -396,7 +384,6 @@ class TestProcessPool(unittest.TestCase):
         def _checks(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
-            self.assertEquals(pp.workers, pp.min)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             
@@ -405,7 +392,6 @@ class TestProcessPool(unittest.TestCase):
 
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
-            self.assertEquals(pp.workers, pp.max)
             self.assertEquals(len(pp.processes), pp.max)
             self.assertEquals(len(pp._finishCallbacks), pp.max)
             
@@ -414,9 +400,59 @@ class TestProcessPool(unittest.TestCase):
 
         return pp.start(
             ).addCallback(_checks
-            ).addBoth(lambda _: pp.stop())
+            ).addCallback(lambda _: pp.stop())
+    
+    def test_growintToMaxAndShrinking(self):
+        """
+        Test that the pool grows but after 'idle' time the number of
+        processes goes back to the minimum.
+        """
+        
+        MAX = 5
+        MIN = 1
+        IDLE = 1
+        pp = pool.ProcessPool(WaitingChild, min=MIN, max=MAX, max_idle=IDLE)
+                
+        def _checks(_):
+            self.assertEquals(pp.started, True)
+            self.assertEquals(pp.finished, False)
+            self.assertEquals(len(pp.processes), pp.min)
+            self.assertEquals(len(pp._finishCallbacks), pp.min)
+            
+            D = "DATA"
+            d = [pp.doWork(First, data=D) for x in xrange(MAX)]
 
-
+            self.assertEquals(pp.started, True)
+            self.assertEquals(pp.finished, False)
+            self.assertEquals(len(pp.processes), pp.max)
+            self.assertEquals(len(pp._finishCallbacks), pp.max)
+            
+            [child.callRemote(Second) for child in pp.processes]
+            return defer.DeferredList(d).addCallback(_realChecks)
+            
+        def _realChecks(_):
+            from twisted.internet import reactor
+            d = defer.Deferred()
+            def _cb():
+                def __(_):
+                    try:
+                        self.assertEquals(pp.started, True)
+                        self.assertEquals(pp.finished, False)
+                        self.assertEquals(len(pp.processes), pp.min)
+                        self.assertEquals(len(pp._finishCallbacks), pp.min)
+                        d.callback(None)
+                    except Exception, e:
+                        d.errback(e)
+                return pp._pruneProcesses().addCallback(__)
+            # just to be shure we are called after the pruner
+            pp.looping.stop() # stop the looping, we don't want it to
+                              # this right here
+            reactor.callLater(IDLE, _cb)
+            return d
+        
+        return pp.start(
+            ).addCallback(_checks
+            ).addCallback(lambda _: pp.stop())
 
 
 

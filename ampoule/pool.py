@@ -1,7 +1,9 @@
+import time
 import random
 choice = random.choice
+now = time.time
 
-from twisted.internet import defer
+from twisted.internet import defer, task
 from twisted.python import log
 
 from ampoule.main import startAMPProcess
@@ -16,23 +18,22 @@ class ProcessPool(object):
     
     @ivar started: Boolean flag, L{True} when the pool is started.
     
-    @ivar workers: Number of workers currently active.
-    
     @ivar name: Optional name for the process pool
     
     @ivar min: Minimum number of subprocesses to set up
     
     @ivar max: Maximum number of subprocesses to set up
+    
+    @ivar max_idle: Maximum number of seconds of indleness in a child
     """
 
     finished = False
     started = False
-    workers = 0
     name = None
 
     processFactory = staticmethod(startAMPProcess)
     
-    def __init__(self, ampChild=None, ampParent=None, min=5, max=20, name=None):
+    def __init__(self, ampChild=None, ampParent=None, min=5, max=20, name=None, max_idle=20):
         self.ampParent = ampParent
         self.ampChild = ampChild
         if ampChild is None:
@@ -41,11 +42,15 @@ class ProcessPool(object):
         self.min = min
         self.max = max
         self.name = name
+        self.max_idle = max_idle
         
-        self.processes = []
+        self.processes = set()
         self.ready = set()
         self.busy = set()
         self._finishCallbacks = {}
+        self._lastUsage = {}
+        self.looping = task.LoopingCall(self._pruneProcesses)
+        self.looping.start(max_idle, now=False)
     
     def start(self, ampChild=None):
         """
@@ -60,35 +65,54 @@ class ProcessPool(object):
         self.started = True
         return self.adjustPoolSize()
     
+    def _pruneProcesses(self):
+        n = now()
+        d = []
+        for child, lastUse in self._lastUsage.iteritems():
+            if len(self.processes) > self.min and (n - lastUse) > self.max_idle:
+                # we are setting lastUse when processing finishes, it might be processing right now
+                if child not in self.busy: 
+                    # we need to remove this child from the ready set
+                    # and the processes set because otherwise it might
+                    # get calls from doWork
+                    self.ready.discard(child)
+                    self.processes.discard(child)
+                    d.append(self.stopAWorker(child))
+        return defer.DeferredList(d)
+    
+    def _pruneProcess(self, child):
+        """
+        Remove every trace of the process from this instance.
+        """
+        self.processes.discard(child)
+        self.ready.discard(child)
+        self.busy.discard(child)
+        self._finishCallbacks.pop(child, None)
+        self._lastUsage.pop(child, None)
+    
+    def _addProcess(self, child, finished):
+        """
+        Adds the newly created child process to the pool.
+        """
+        def restart(child, reason):
+            log.msg("FATAL: Restarting after %s" % (reason,))
+            self._pruneProcess(child)
+            return self.startAWorker()
+
+        def dieGently(data, child):
+            log.msg("STOPPING: '%s'" % (data,))
+            self._pruneProcess(child)
+        
+        self.processes.add(child)
+        self.ready.add(child)
+        finished.addCallback(dieGently, child
+               ).addErrback(lambda reason: restart(child, reason))
+        self._finishCallbacks[child] = finished
+        self._lastUsage[child] = now()
+    
     def startAWorker(self):
         ready, finished = self.processFactory(self.ampChild, ampParent=self.ampParent, packages=('twisted', 'ampoule'))
-        
-        def started(child):
-            def restart(child, reason):
-                log.msg("FATAL: Restarting after %s" % (reason,))
-                self.workers -= 1
-                self.processes.remove(child)
-                self.ready.discard(child)
-                self.busy.discard(child)
-                self._finishCallbacks.pop(child, None)
-                return self.startAWorker()
-
-            def dieGently(data, child):
-                log.msg("STOPPING: '%s'" % (data,))
-                self.workers -= 1
-                self.processes.remove(child)
-                self.ready.discard(child)
-                self.busy.discard(child)
-                self._finishCallbacks.pop(child, None)
-            
-            self.workers += 1
-            self.processes.append(child)
-            self.ready.add(child)
-            finished.addCallback(dieGently, child
-                   ).addErrback(lambda reason: restart(child, reason))
-            self._finishCallbacks[child] = finished
-            
-        return ready.addCallback(started)
+        return ready.addCallback(self._addProcess, finished)
     
     def doWork(self, command, **kwargs):
         """
@@ -102,6 +126,7 @@ class ProcessPool(object):
         def _returned(result, child):
             self.busy.discard(child)
             self.ready.add(child)
+            self._lastUsage[child] = now()
             return result
         
         def _cb(child=None):
@@ -118,7 +143,7 @@ class ProcessPool(object):
                 return self.startAWorker().addCallback(lambda _: _cb())
             else:
                 # will have to go the random way, everyone is busy
-                child = choice(self.processes)
+                child = choice(list(self.processes))
                 return _cb(child)
     
     def stopAWorker(self, child=None):
@@ -126,7 +151,7 @@ class ProcessPool(object):
             if self.ready:
                 child = self.ready.pop()
             else:
-                child = choice(self.processes)
+                child = choice(list(self.processes))
         child.callRemote(commands.Shutdown)
         return self._finishCallbacks[child]
     
@@ -150,9 +175,9 @@ class ProcessPool(object):
         self.max = max
         
         if self.started:
-            while self.workers > self.max:
+            while len(self.processes) > self.max:
                 yield self.stopAWorker()
-            while self.workers < self.min:
+            while len(self.processes) < self.min:
                 yield self.startAWorker()
 
     @defer.inlineCallbacks
@@ -163,11 +188,13 @@ class ProcessPool(object):
         self.finished = True
         for stopping in [self.stopAWorker(process) for process in self.processes]:
             yield stopping
+        if self.looping.running:
+            self.looping.stop()
 
     def dumpStats(self):
-        log.msg('workers: %s' % self.workers)
+        log.msg('workers: %s' % len(self.processes))
 
-pp = ProcessPool()
+pp = None
 
 def deferToAMPProcess(command, **kwargs):
     """
@@ -180,6 +207,8 @@ def deferToAMPProcess(command, **kwargs):
     
     @return: a L{defer.Deferred} with the data from the subprocess.
     """
-    if not pp.started:
+    global pp
+    if pp is None:
+        pp = ProcessPool()
         return pp.start().addCallback(lambda _: pp.doWork(command, **kwargs))
     return pp.doWork(command, **kwargs)

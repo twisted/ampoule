@@ -1,2 +1,2 @@
-* Shrinking of the pool when idle
 * Remote process creation
+* Process recycling
