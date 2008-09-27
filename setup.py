@@ -35,7 +35,7 @@ setup(
     license = "MIT License",
     version=ampoule.__version__,
     install_requires=install_requires,
-    url="http://www.assembla.com/wiki/show/ampoule",
+    url="https://launchpad.net/ampoule",
     classifiers = [
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
