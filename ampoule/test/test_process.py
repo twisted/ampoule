@@ -1,3 +1,4 @@
+import math
 from cStringIO import StringIO as sio
 
 from twisted.internet import error, defer
@@ -5,12 +6,6 @@ from twisted.python import failure, reflect
 from twisted.trial import unittest
 from twisted.protocols import amp
 from ampoule import main, child, commands, pool
-
-import good
-import bad
-
-good_path = reflect.fullFuncName(good.main)
-bad_path = reflect.fullFuncName(bad.main)
 
 class ShouldntHaveBeenCalled(Exception):
     pass
@@ -56,10 +51,19 @@ class Pong(amp.Command):
     arguments = [('data', amp.String())]
     response = [('response', amp.String())]
 
+class Pid(amp.Command):
+    response = [('pid', amp.Integer())]
+
 class Child(child.AMPChild):
     def ping(self, data):
         return self.callRemote(Pong, data=data)
     Ping.responder(ping)
+
+class PidChild(child.AMPChild):
+    def pid(self):
+        import os
+        return {'pid': os.getpid()}
+    Pid.responder(pid)
 
 class First(amp.Command):
     arguments = [('data', amp.String())]
@@ -134,18 +138,21 @@ class TestAMPConnector(unittest.TestCase):
         it receives data back from the process through AMP.
         """
         STRING = "ciao"
-        wasReady = []
-        def _readyCalled(child):
-            wasReady.append(True)
         s = sio()
         a = FakeAMP(s)
-        ready, finished = main.startProcess(main.AMPConnector(a), good_path, STRING, packages=("ampoule", "twisted"))
+        BOOT = """\
+import sys
+def main(arg):
+    sys.stdout.write(arg)
+main(sys.argv[1])
+"""
+        amp, finished = main.startProcess(main.AMPConnector(a),
+                                          STRING, bootstrap=BOOT,
+                                          packages=("ampoule", "twisted"))
         def _eb(reason):
             print reason
         finished.addErrback(_eb)
-        finished.addCallback(lambda _: self.assertEquals(s.getvalue(), STRING))
-        ready.addCallback(_readyCalled)
-        return finished.addCallback(lambda _: self.assertEquals(wasReady, [True]))
+        return finished.addCallback(lambda _: self.assertEquals(s.getvalue(), STRING))
     
     def test_failing_deferToProcess(self):
         """
@@ -155,7 +162,15 @@ class TestAMPConnector(unittest.TestCase):
         STRING = "ciao"
         s = sio()
         a = FakeAMP(s)
-        ready, finished = main.startProcess(main.AMPConnector(a), bad_path, STRING, packages=("ampoule", "twisted"))
+        BOOT = """\
+import sys
+def main(arg):
+    raise Exception(arg)
+main(sys.argv[1])
+"""
+        ready, finished = main.startProcess(main.AMPConnector(a),
+                                            STRING, bootstrap=BOOT,
+                                            packages=("ampoule", "twisted"))
         self.assertFailure(finished, error.ProcessTerminated)
         finished.addErrback(lambda reason: self.assertEquals(reason.getMessage(), STRING))
         return finished
@@ -166,13 +181,11 @@ class TestAMPConnector(unittest.TestCase):
         accepts commands and correctly answers them.
         """
         STRING = "ciao"
-        ready, finished = main.startAMPProcess(child.AMPChild, packages=('ampoule', 'twisted'))
-        def _isReady(c):
-            return c.callRemote(commands.Echo, data=STRING
-                       ).addCallback(lambda response:
-                            self.assertEquals(response['response'], STRING)
-                       ).addCallback(lambda _: c.callRemote(commands.Shutdown))
-        ready.addCallback(_isReady)
+        c, finished = main.startAMPProcess(child.AMPChild, packages=('ampoule', 'twisted'))
+        c.callRemote(commands.Echo, data=STRING
+           ).addCallback(lambda response:
+                self.assertEquals(response['response'], STRING)
+           ).addCallback(lambda _: c.callRemote(commands.Shutdown))
         return finished
 
     def test_startAMPAndParentProtocol(self):
@@ -188,13 +201,11 @@ class TestAMPConnector(unittest.TestCase):
                 return {'response': DATA+APPEND}
             Pong.responder(pong)
         
-        ready, finished = main.startAMPProcess(Child, ampParent=Parent, packages=('ampoule', 'twisted'))
-        def _isReady(subp):
-            return subp.callRemote(Ping, data=DATA
-                       ).addCallback(lambda response:
-                            self.assertEquals(response['response'], DATA+APPEND)
-                       ).addCallback(lambda _: subp.callRemote(commands.Shutdown))
-        ready.addCallback(_isReady)
+        subp, finished = main.startAMPProcess(Child, ampParent=Parent, packages=('ampoule', 'twisted'))
+        subp.callRemote(Ping, data=DATA
+           ).addCallback(lambda response:
+                self.assertEquals(response['response'], DATA+APPEND)
+           ).addCallback(lambda _: subp.callRemote(commands.Shutdown))
         return finished
 
     def test_roundtripError(self):
@@ -219,7 +230,7 @@ class TestProcessPool(unittest.TestCase):
         self.assertEquals(pp.processes, set())
         self.assertEquals(pp._finishCallbacks, {})
 
-        def _checks(_):
+        def _checks():
             self.assertEquals(pp.started, False)
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), 1)
@@ -231,7 +242,8 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), 0)
             self.assertEquals(pp._finishCallbacks, {})
-        return pp.startAWorker().addCallback(_checks).addCallback(_closingUp).addCallback(lambda _: pp.stop())
+        pp.startAWorker()
+        return _checks().addCallback(_closingUp).addCallback(lambda _: pp.stop())
 
     def test_startAndStop(self):
         """
@@ -402,7 +414,7 @@ class TestProcessPool(unittest.TestCase):
             ).addCallback(_checks
             ).addCallback(lambda _: pp.stop())
     
-    def test_growintToMaxAndShrinking(self):
+    def test_growingToMaxAndShrinking(self):
         """
         Test that the pool grows but after 'idle' time the number of
         processes goes back to the minimum.
@@ -411,7 +423,7 @@ class TestProcessPool(unittest.TestCase):
         MAX = 5
         MIN = 1
         IDLE = 1
-        pp = pool.ProcessPool(WaitingChild, min=MIN, max=MAX, max_idle=IDLE)
+        pp = pool.ProcessPool(WaitingChild, min=MIN, max=MAX, maxIdle=IDLE)
                 
         def _checks(_):
             self.assertEquals(pp.started, True)
@@ -454,12 +466,93 @@ class TestProcessPool(unittest.TestCase):
             ).addCallback(_checks
             ).addCallback(lambda _: pp.stop())
 
+    def test_recycling(self):
+        """
+        Test that after a given number of calls subprocesses are
+        recycled.
+        """
+        MAX = 1
+        MIN = 1
+        RECYCLE_AFTER = 1
+        pp = pool.ProcessPool(PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        
+        def _checks(_):
+            self.assertEquals(pp.started, True)
+            self.assertEquals(pp.finished, False)
+            self.assertEquals(len(pp.processes), pp.min)
+            self.assertEquals(len(pp._finishCallbacks), pp.min)
+            return pp.doWork(Pid
+                ).addCallback(lambda response: response['pid'])
+        
+        def _checks2(pid):
+            return pp.doWork(Pid
+                ).addCallback(lambda response: response['pid']
+                ).addCallback(self.assertNotEquals, pid)
+        
+        def finish(reason):
+            return pp.stop().addCallback(lambda _: reason)
 
+        return pp.start(
+            ).addCallback(_checks
+            ).addCallback(_checks2
+            ).addCallback(finish)
+    
+    def test_recyclingWithQueueOverload(self):
+        """
+        Test that we get the correct number of different results when
+        we overload the pool of calls.
+        """
+        MAX = 5
+        MIN = 1
+        RECYCLE_AFTER = 10
+        CALLS = 60
+        pp = pool.ProcessPool(PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        
+        def _check(results):
+            s = set()
+            for succeed, response in results:
+                s.add(response['pid'])
+            self.assertEquals(len(s), MAX*math.ceil(float(CALLS)/(MAX*RECYCLE_AFTER)))
+        
+        def _work(_):
+            l = [pp.doWork(Pid) for x in xrange(CALLS)]
+            d = defer.DeferredList(l)
+            return d.addCallback(_check)
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(lambda _: pp.stop())
 
+    def test_disableProcessRecycling(self):
+        """
+        Test that by setting 0 to recycleAfter we actually disable process recycling.
+        """
+        MAX = 1
+        MIN = 1
+        RECYCLE_AFTER = 0
+        pp = pool.ProcessPool(PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        
+        def _checks(_):
+            self.assertEquals(pp.started, True)
+            self.assertEquals(pp.finished, False)
+            self.assertEquals(len(pp.processes), pp.min)
+            self.assertEquals(len(pp._finishCallbacks), pp.min)
+            return pp.doWork(Pid
+                ).addCallback(lambda response: response['pid'])
+        
+        def _checks2(pid):
+            return pp.doWork(Pid
+                ).addCallback(lambda response: response['pid']
+                ).addCallback(self.assertEquals, pid
+                ).addCallback(lambda _: pid)
+        
+        def finish(reason):
+            return pp.stop().addCallback(lambda _: reason)
 
-
-
-
+        return pp.start(
+            ).addCallback(_checks
+            ).addCallback(_checks2
+            ).addCallback(_checks2
+            ).addCallback(finish)        
 
 
 

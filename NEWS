@@ -1,0 +1,25 @@
+Ampoule 0.0.2 (2008-09-26)
+==========================
+
+Features
+--------
+ - Support process recycling after predefined number of calls.
+
+Changes
+-------
+ - ProcessPool argument max_idle is now maxIdle to comply with Twisted
+   style guidelines.
+
+ - ProcessPool.startAWorker is now a synchronous call
+
+ - removed ampoule.runner module because it was essentially useless,
+   if you want to change subprocess startup behavior pass it as an
+   argument by overriding the processFactory with a closure like this:
+       
+       from ampoule.main import startAMPProcess
+       from ampoule.pool import ProcessPool
+       pp = ProcessPool()
+       def myProcessFactory(*args, **kwargs):
+           kwargs['bootstrap'] = myBootstrapCode
+           return startAMPProcess(*args, **kwargs)
+       pp.processFactory = staticmethod(myProcessFactory)

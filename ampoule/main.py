@@ -10,13 +10,20 @@ from twisted.protocols import amp
 
 gen = itertools.count()
 
-from ampoule import runner
-runner = reflect.fullFuncName(runner.main)
-
 BOOTSTRAP = """\
 import sys
-from twisted.python import reflect
-reflect.namedAny(sys.argv[1])(*sys.argv[2:])
+
+def main(ampChildPath):
+    from twisted.python import log
+    log.startLogging(sys.stderr)
+
+    from twisted.internet import reactor, stdio
+    from twisted.python import reflect
+
+    ampChild = reflect.namedAny(ampChildPath)
+    stdio.StandardIO(ampChild())
+    reactor.run()
+main(sys.argv[1])
 """
 
 def _checkRoundTrip(obj):
@@ -51,30 +58,35 @@ def startAMPProcess(ampChild, *args, **kwargs):
     if ampParent is None:
         ampParent = amp.AMP
     prot = AMPConnector(ampParent())
-    return startProcess(prot, runner, fullPath, *args, **kwargs)
+    return startProcess(prot, fullPath, *args, **kwargs)
 
 def startProcess(prot, *args, **kwargs):
     """
     @param prot: a L{protocol.ProcessProtocol} subclass
     @type prot: L{protocol.ProcessProtocol}
     
-    @return: a tuple of deferreds ready and finished. ready triggers
-             when the corresponding protocol calls L{connectionMade}
-             while finished when the subprocess dies for any reason.
+    @return: a tuple of the child process and the deferred finished.
+             finished triggers when the subprocess dies for any reason.
     """
     spawnProcess(prot, tuple(args), **kwargs)
-    return prot.ready, prot.finished
+    
+    # XXX: we could wait for startup here, but ... is there really any
+    # reason to?  the pipe should be ready for writing.  The subprocess
+    # might not start up properly, but then, a subprocess might shut down
+    # at any point too. So we just return amp and have this piece to be
+    # synchronous.
+    return prot.amp, prot.finished
 
 class AMPConnector(protocol.ProcessProtocol):
     """
     A L{ProcessProtocol} subclass that can understand and speak AMP.
+
+    @ivar amp: the children AMP process
+    @type amp: L{amp.AMP}
     
     @ivar finished: a deferred triggered when the process dies.
     @type finished: L{defer.Deferred}
 
-    @ivar ready: a deferred triggered when the protocol called connectionMade.
-    @type ready: L{defer.Deferred}
-    
     @ivar name: Unique name for the connector, much like a pid.
     @type name: int
     """
@@ -88,7 +100,6 @@ class AMPConnector(protocol.ProcessProtocol):
         @type name: int
         """
         self.finished = defer.Deferred()
-        self.ready = defer.Deferred()
         self.amp = proto
         self.name = name
         if name is None:
@@ -97,7 +108,6 @@ class AMPConnector(protocol.ProcessProtocol):
     def connectionMade(self):
         log.msg("Subprocess %s started." % (self.name,))
         self.amp.makeConnection(self)
-        self.ready.callback(self.amp)
         
     # Transport
     disconnecting = False
@@ -112,16 +122,17 @@ class AMPConnector(protocol.ProcessProtocol):
         self.transport.loseConnection()
 
     def getPeer(self):
-        return ('omfg what are you talking about',)
+        return ('subprocess',)
 
     def getHost(self):
-        return ('seriously it is a process this makes no sense',)
+        return ('no host',)
 
     def outReceived(self, data):
         self.amp.dataReceived(data)
 
     def errReceived(self, data):
-        log.msg("FROM %s: %s" % (self.name, repr(data.strip())))
+        for line in data.strip().splitlines():
+            log.msg("FROM %s: %s" % (self.name, line))
 
     def processEnded(self, status):
         log.msg("Process: %s ended" % (self.name,))
@@ -133,7 +144,7 @@ class AMPConnector(protocol.ProcessProtocol):
 
 def spawnProcess(processProtocol, args=(), env={},
                  path=None, uid=None, gid=None, usePTY=0,
-                 packages=()):
+                 packages=(), bootstrap=BOOTSTRAP):
     env = env.copy()
 
     pythonpath = []
@@ -145,7 +156,6 @@ def spawnProcess(processProtocol, args=(), env={},
     pythonpath = list(sets.Set(pythonpath))
     pythonpath.extend(env.get('PYTHONPATH', '').split(os.pathsep))
     env['PYTHONPATH'] = os.pathsep.join(pythonpath)
-    args = (sys.executable, '-c', BOOTSTRAP) + args
-
+    args = (sys.executable, '-c', bootstrap) + args
     return reactor.spawnProcess(processProtocol, sys.executable, args,
                                 env, path, uid, gid, usePTY)
