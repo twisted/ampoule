@@ -45,5 +45,6 @@ setup(
         'Topic :: System',
     ],
     packages=find_packages(exclude=['ez_setup', 'examples']),
+    include_package_data = True,
     zip_safe=False
 )
