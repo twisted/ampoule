@@ -21,8 +21,7 @@ install_requires = ["Twisted>=8.0.1"]
 setup = setuptools.setup
 find_packages = setuptools.find_packages
 
-description = """\
-A process pool implementation in Twisted that can speak the AMP protocol"""
+description = """A process pool implementation in Twisted Matrix and AMP"""
 
 long_description = file('README').read()
 

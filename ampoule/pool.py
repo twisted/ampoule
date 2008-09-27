@@ -31,7 +31,7 @@ class ProcessPool(object):
     @ivar maxIdle: Maximum number of seconds of indleness in a child
     
     @ivar recycleAfter: Maximum number of calls before restarting a subprocess,
-                        0 to not recycle ever.
+                        0 to not recycle.
     """
 
     finished = False
@@ -232,7 +232,7 @@ class ProcessPool(object):
                 return d
             else:
                 # No one is free... just queue up and wait for a process
-                # to start and pick up the first queue in the item.
+                # to start and pick up the first item in the queue.
                 self._queue.append((count(), (d, command, kwargs)))
                 return d
     
