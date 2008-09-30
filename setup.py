@@ -96,10 +96,9 @@ def autosetup(**kw):
     assert 'packages' not in kw
     assert 'package_data' not in kw
     kw.update(autoresult)
-    print kw
-    #distobj = setup(**kw)
-    #regeneratePluginCache(distobj, pluginPackages)
-    #return distobj
+    distobj = setup(**kw)
+    regeneratePluginCache(distobj, pluginPackages)
+    return distobj
 
 
 description = """A process pool implementation in Twisted Matrix and AMP"""
