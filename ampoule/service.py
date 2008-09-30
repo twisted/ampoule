@@ -20,10 +20,9 @@ def makeService(options):
     max = options['max']
     maxIdle = options['max_idle']
     recycle = options['recycle']
+    childReactor = options['reactor']
     
-    pp = ProcessPool(child, parent, min, max, name, maxIdle, recycle)
-    pp.start() # this is synchronous when it's the startup, even though
-               # it returns a deferred.
+    pp = ProcessPool(child, parent, min, max, name, maxIdle, recycle, childReactor)
     svc = AMPouleService(pp, child, ampport, ampinterface)
     svc.setServiceParent(ms)
 
@@ -52,6 +51,11 @@ class AMPouleService(service.Service):
             self.server = reactor.listenTCP(self.port,
                                             factory,
                                             interface=self.interface)
+            # this is synchronous when it's the startup, even though
+            # it returns a deferred. But we need to run it after the
+            # first cycle in order to wait for signal handlers to be
+            # installed.
+            reactor.callLater(0, self.pool.start)
         except:
             import traceback
             print traceback.format_exc()

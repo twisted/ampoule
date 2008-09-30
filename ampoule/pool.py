@@ -41,7 +41,7 @@ class ProcessPool(object):
     processFactory = staticmethod(startAMPProcess)
     
     def __init__(self, ampChild=None, ampParent=None, min=5, max=20,
-                 name=None, maxIdle=20, recycleAfter=500):
+                 name=None, maxIdle=20, recycleAfter=500, childReactor="select"):
         self.ampParent = ampParent
         self.ampChild = ampChild
         if ampChild is None:
@@ -52,6 +52,7 @@ class ProcessPool(object):
         self.name = name
         self.maxIdle = maxIdle
         self.recycleAfter = recycleAfter
+        self.childReactor = childReactor
         self._queue = []
         
         self.processes = set()
@@ -156,6 +157,7 @@ class ProcessPool(object):
             return
         child, finished = self.processFactory(self.ampChild,
                                               ampParent=self.ampParent,
+                                              childReactor=self.childReactor,
                                               packages=('twisted', 'ampoule'))
         return self._addProcess(child, finished)
     

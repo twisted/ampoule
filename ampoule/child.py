@@ -1,4 +1,5 @@
 from twisted.python import log
+from twisted.internet import error
 from twisted.protocols import amp
 from ampoule.commands import Echo, Shutdown, Ping
 
@@ -10,7 +11,17 @@ class AMPChild(amp.AMP):
     def connectionLost(self, reason):
         amp.AMP.connectionLost(self, reason)
         from twisted.internet import reactor
-        reactor.stop()
+        try:
+            reactor.stop()
+        except error.ReactorNotRunning:
+            # woa, this means that something bad happened,
+            # most probably we received a SIGINT. Now this is only
+            # a problem when you use Ctrl+C to stop the main process
+            # because it would send the SIGINT to child processes too.
+            # In all other cases receiving a SIGINT here would be an
+            # error condition and correctly restarted. maybe we should
+            # use sigprocmask?
+            pass
         if not self.shutdown:
             import os
             os._exit(-1)

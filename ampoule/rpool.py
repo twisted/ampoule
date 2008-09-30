@@ -31,7 +31,7 @@ class AMPProxy(amp.AMP):
         childCd = set(self.child._commandDispatch.keys())
         assert localCd.intersection(childCd) == set(["StartTLS"]), \
                     "Illegal method overriding in Proxy"
-        
+    
     def locateResponder(self, name):
         """
         This is a custom locator to forward calls to the children
@@ -46,7 +46,7 @@ class AMPProxy(amp.AMP):
         if name == "StartTLS":
             # This is a special case where the proxy takes precedence
             return amp.AMP.locateResponder(self, "StartTLS")
-
+    
         # Get the dict of commands from the child AMP implementation.
         cd = self.child._commandDispatch
         if name in cd:

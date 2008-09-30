@@ -54,6 +54,9 @@ class Pong(amp.Command):
 class Pid(amp.Command):
     response = [('pid', amp.Integer())]
 
+class Reactor(amp.Command):
+    response = [('classname', amp.String())]
+
 class Child(child.AMPChild):
     def ping(self, data):
         return self.callRemote(Pong, data=data)
@@ -64,6 +67,12 @@ class PidChild(child.AMPChild):
         import os
         return {'pid': os.getpid()}
     Pid.responder(pid)
+
+class ReactorChild(child.AMPChild):
+    def reactor(self):
+        from twisted.internet import reactor
+        return {'classname': reactor.__class__.__name__}
+    Reactor.responder(reactor)
 
 class First(amp.Command):
     arguments = [('data', amp.String())]
@@ -553,6 +562,34 @@ class TestProcessPool(unittest.TestCase):
             ).addCallback(_checks2
             ).addCallback(_checks2
             ).addCallback(finish)        
-
-
-
+    
+    def test_changeChildrenReactor(self):
+        """
+        Test that by passing the correct argument children change their
+        reactor type.
+        """
+        MAX = 1
+        MIN = 1
+        FIRST = "select"
+        SECOND = "poll"
+        
+        def checkDefault():
+            pp = pool.ProcessPool(ReactorChild, min=MIN, max=MAX, childReactor=FIRST)
+            pp.start()
+            return pp.doWork(Reactor
+                ).addCallback(self.assertEquals, {'classname': "SelectReactor"}
+                ).addCallback(lambda _: pp.stop())
+            
+        def checkPool(_):
+            pp = pool.ProcessPool(ReactorChild, min=MIN, max=MAX, childReactor=SECOND)
+            pp.start()
+            return pp.doWork(Reactor
+                ).addCallback(self.assertEquals, {'classname': "PollReactor"}
+                ).addCallback(lambda _: pp.stop())
+            
+        return checkDefault(
+            ).addCallback(checkPool)
+    try:
+        from select import poll
+    except ImportError:
+        test_changeChildrenReactor.skip = "This architecture doesn't support select.poll, I can't run this test"

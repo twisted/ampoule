@@ -13,7 +13,10 @@ gen = itertools.count()
 BOOTSTRAP = """\
 import sys
 
-def main(ampChildPath):
+def main(reactor, ampChildPath):
+    from twisted.application import reactors
+    reactors.installReactor(reactor)
+    
     from twisted.python import log
     log.startLogging(sys.stderr)
 
@@ -23,7 +26,7 @@ def main(ampChildPath):
     ampChild = reflect.namedAny(ampChildPath)
     stdio.StandardIO(ampChild())
     reactor.run()
-main(sys.argv[1])
+main(sys.argv[1], sys.argv[2])
 """
 
 def _checkRoundTrip(obj):
@@ -51,14 +54,21 @@ def startAMPProcess(ampChild, *args, **kwargs):
                  subprocess
     @param kwargs: a dictionary that contains extra arguments for the
                    spawnProcess call.
+    
+    @param childReactor: a string that sets the reactor for child
+                         processes
+    @type childReactor: L{str}
     """
     _checkRoundTrip(ampChild)
     fullPath = reflect.qual(ampChild)
     ampParent = kwargs.pop('ampParent', None)
     if ampParent is None:
         ampParent = amp.AMP
+    childReactor = kwargs.pop('childReactor', None)
+    if childReactor is None:
+        childReactor = "select"
     prot = AMPConnector(ampParent())
-    return startProcess(prot, fullPath, *args, **kwargs)
+    return startProcess(prot, childReactor, fullPath, *args, **kwargs)
 
 def startProcess(prot, *args, **kwargs):
     """
