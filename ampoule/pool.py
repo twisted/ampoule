@@ -40,7 +40,7 @@ class ProcessPool(object):
 
     processFactory = staticmethod(startAMPProcess)
     
-    def __init__(self, ampChild=None, ampParent=None, min=5, max=20, name=None, maxIdle=20, recycleAfter=30):
+    def __init__(self, ampChild=None, ampParent=None, min=5, max=20, name=None, maxIdle=20, recycleAfter=500):
         self.ampParent = ampParent
         self.ampChild = ampChild
         if ampChild is None:
