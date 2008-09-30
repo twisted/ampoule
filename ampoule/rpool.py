@@ -8,8 +8,8 @@ from twisted.internet import utils
 
 class AMPProxy(amp.AMP):
     """
-    A Proxy AMP protocol that forwards calls to a wrapped callRemote-like
-    callable.
+    A Proxy AMP protocol that forwards calls to a wrapped
+    callRemote-like callable.
     """
     def __init__(self, wrapped, child):
         """

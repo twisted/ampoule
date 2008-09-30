@@ -30,8 +30,8 @@ class ProcessPool(object):
     
     @ivar maxIdle: Maximum number of seconds of indleness in a child
     
-    @ivar recycleAfter: Maximum number of calls before restarting a subprocess,
-                        0 to not recycle.
+    @ivar recycleAfter: Maximum number of calls before restarting a
+                        subprocess, 0 to not recycle.
     """
 
     finished = False
@@ -40,7 +40,8 @@ class ProcessPool(object):
 
     processFactory = staticmethod(startAMPProcess)
     
-    def __init__(self, ampChild=None, ampParent=None, min=5, max=20, name=None, maxIdle=20, recycleAfter=500):
+    def __init__(self, ampChild=None, ampParent=None, min=5, max=20,
+                 name=None, maxIdle=20, recycleAfter=500):
         self.ampParent = ampParent
         self.ampChild = ampChild
         if ampChild is None:
@@ -83,7 +84,8 @@ class ProcessPool(object):
         d = []
         for child, lastUse in self._lastUsage.iteritems():
             if len(self.processes) > self.min and (n - lastUse) > self.maxIdle:
-                # we are setting lastUse when processing finishes, it might be processing right now
+                # we are setting lastUse when processing finishes, it
+                # might be processing right now
                 if child not in self.busy: 
                     # we need to remove this child from the ready set
                     # and the processes set because otherwise it might
@@ -152,7 +154,9 @@ class ProcessPool(object):
             # You might end up with a dirty reactor due to the stop()
             # returning before the new process is created.
             return
-        child, finished = self.processFactory(self.ampChild, ampParent=self.ampParent, packages=('twisted', 'ampoule'))
+        child, finished = self.processFactory(self.ampChild,
+                                              ampParent=self.ampParent,
+                                              packages=('twisted', 'ampoule'))
         return self._addProcess(child, finished)
     
     def _cb_doWork(self, command, _d=None, **kwargs):

@@ -22,6 +22,8 @@ def makeService(options):
     recycle = options['recycle']
     
     pp = ProcessPool(child, parent, min, max, name, maxIdle, recycle)
+    pp.start() # this is synchronous when it's the startup, even though
+               # it returns a deferred.
     svc = AMPouleService(pp, child, ampport, ampinterface)
     svc.setServiceParent(ms)
 
@@ -47,7 +49,9 @@ class AMPouleService(service.Service):
             factory = ServerFactory()
             factory.protocol = lambda: rpool.AMPProxy(wrapped=self.pool.doWork,
                                                       child=self.child)
-            self.server = reactor.listenTCP(self.port, factory, interface=self.interface)
+            self.server = reactor.listenTCP(self.port,
+                                            factory,
+                                            interface=self.interface)
         except:
             import traceback
             print traceback.format_exc()
@@ -56,3 +60,4 @@ class AMPouleService(service.Service):
         service.Service.stopService(self)
         if self.server is not None:
             self.server.stopListening()
+        return self.pool.stop()
