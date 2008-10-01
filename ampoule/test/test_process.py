@@ -57,6 +57,13 @@ class Pid(amp.Command):
 class Reactor(amp.Command):
     response = [('classname', amp.String())]
 
+class NoResponse(amp.Command):
+    arguments = [('arg', amp.String())]
+    requiresAnswer = False
+
+class GetResponse(amp.Command):
+    response = [("response", amp.String())]
+
 class Child(child.AMPChild):
     def ping(self, data):
         return self.callRemote(Pong, data=data)
@@ -67,6 +74,17 @@ class PidChild(child.AMPChild):
         import os
         return {'pid': os.getpid()}
     Pid.responder(pid)
+
+class NoResponseChild(child.AMPChild):
+    _set = False
+    def noresponse(self, arg):
+        self._set = arg
+        return {}
+    NoResponse.responder(noresponse)
+    
+    def getresponse(self):
+        return {"response": self._set}
+    GetResponse.responder(getresponse)
 
 class ReactorChild(child.AMPChild):
     def reactor(self):
@@ -593,3 +611,23 @@ class TestProcessPool(unittest.TestCase):
         from select import poll
     except ImportError:
         test_changeChildrenReactor.skip = "This architecture doesn't support select.poll, I can't run this test"
+
+    def test_commandsWithoutResponse(self):
+        """
+        Test that if we send a command without a required answer we
+        actually don't have any problems.
+        """
+        DATA = "hello"
+        pp = pool.ProcessPool(NoResponseChild, min=1, max=1)
+
+        def _check(_):
+            return pp.doWork(GetResponse
+                ).addCallback(self.assertEquals, {"response": DATA})
+        
+        def _work(_):
+            return pp.doWork(NoResponse, arg=DATA)
+
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(_check
+            ).addCallback(lambda _: pp.stop())

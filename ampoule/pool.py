@@ -32,6 +32,9 @@ class ProcessPool(object):
     
     @ivar recycleAfter: Maximum number of calls before restarting a
                         subprocess, 0 to not recycle.
+    
+    @ivar childReactor: The shortName of the reactor to be used in
+                        each child process
     """
 
     finished = False
@@ -206,10 +209,12 @@ class ProcessPool(object):
             # it does so mark this child, using a closure, to be
             # removed at the end of the call.
             die = True
-        return child.callRemote(command, **kwargs
+
+        # If the command doesn't require a response then callRemote
+        # returns nothing, so we prepare for that too.
+        return defer.maybeDeferred(child.callRemote, command, **kwargs
             ).addCallback(_returned, child
             ).addErrback(_returned, child, is_error=True)
-
     
     def doWork(self, command, **kwargs):
         """
