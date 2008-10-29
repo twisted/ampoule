@@ -1,7 +1,6 @@
 import os
 
 from twisted.application import service
-from twisted.python import log
 from twisted.internet.protocol import ServerFactory
 
 def makeService(options):
