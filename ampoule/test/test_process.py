@@ -138,7 +138,7 @@ class TestAMPConnector(unittest.TestCase):
         ac = self._makeConnector(s, sa)
         
         for x in xrange(99):
-            ac.outReceived(str(x))
+            ac.childDataReceived(4, str(x))
         
         ac.processEnded(failure.Failure(error.ProcessDone(0)))
         return ac.finished.addCallback(
@@ -168,9 +168,9 @@ class TestAMPConnector(unittest.TestCase):
         s = sio()
         a = FakeAMP(s)
         BOOT = """\
-import sys
+import sys, os
 def main(arg):
-    sys.stdout.write(arg)
+    os.write(4, arg)
 main(sys.argv[1])
 """
         amp, finished = main.startProcess(main.AMPConnector(a),

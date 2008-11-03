@@ -24,12 +24,12 @@ def main(reactor, ampChildPath):
     from twisted.python import reflect
 
     ampChild = reflect.namedAny(ampChildPath)
-    stdio.StandardIO(ampChild())
+    stdio.StandardIO(ampChild(), 3, 4)
     reactor.run()
 main(sys.argv[1], sys.argv[2])
 """
 
-def _checkRoundTrip(obj):
+def _checkRoundTrip(obj): 
     """
     Make sure that an object will properly round-trip through 'qual' and
     'namedAny'.
@@ -123,12 +123,11 @@ class AMPConnector(protocol.ProcessProtocol):
     disconnecting = False
 
     def write(self, data):
-        self.transport.write(data)
-
-    def writeSequence(self, data):
-        self.transport.writeSequence(data)
+        self.transport.writeToChild(3, data)
 
     def loseConnection(self):
+        self.transport.closeChildFD(3)
+        self.transport.closeChildfd(4)
         self.transport.loseConnection()
 
     def getPeer(self):
@@ -137,8 +136,11 @@ class AMPConnector(protocol.ProcessProtocol):
     def getHost(self):
         return ('no host',)
 
-    def outReceived(self, data):
-        self.amp.dataReceived(data)
+    def childDataReceived(self, childFD, data):
+        if childFD == 4:
+            self.amp.dataReceived(data)
+            return
+        self.errReceived(data)
 
     def errReceived(self, data):
         for line in data.strip().splitlines():
@@ -167,5 +169,12 @@ def spawnProcess(processProtocol, args=(), env={},
     pythonpath.extend(env.get('PYTHONPATH', '').split(os.pathsep))
     env['PYTHONPATH'] = os.pathsep.join(pythonpath)
     args = (sys.executable, '-c', bootstrap) + args
+    # childFDs variable is needed because sometimes child processes
+    # misbehave and use stdout to output stuff that should really go
+    # to stderr. Of course child process might even use the wrong FDs
+    # that I'm using here, 3 and 4, so we are going to fix all these
+    # issues when I add support for the configuration object that can
+    # fix this stuff in a more configurable way.
     return reactor.spawnProcess(processProtocol, sys.executable, args,
-                                env, path, uid, gid, usePTY)
+                                env, path, uid, gid, usePTY,
+                                childFDs={0:"w", 1:"r", 2:"r", 3:"w", 4:"r"})

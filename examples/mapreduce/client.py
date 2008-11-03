@@ -127,7 +127,7 @@ def process(dirs, resultdir, steps):
 def main(args):
     """
     The mainpoint, the decorator makes this module resolvable by
-    reflect.qual() used by the our Function argument type. Here we
+    reflect.qual() used by our Function argument type. Here we
     define the steps of our processing and we execute them.
     """
     directory_names = [fp.FilePath(name) for name in args[2:]]

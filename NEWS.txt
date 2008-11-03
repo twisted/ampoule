@@ -1,3 +1,12 @@
+Ampoule 0.0.4 (2008-11-03)
+==========================
+
+Changes
+--------
+ - Ampoule parent process and child processes now talk using FDs 3 (in)
+   and 4 (out) in order to avoid problems with libraries that mistakenly
+   send error lines to stdout (yes, I'm looking at you gtk+)
+
 Ampoule 0.0.3 (2008-10-01)
 ==========================
 
