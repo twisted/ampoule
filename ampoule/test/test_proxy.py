@@ -22,7 +22,8 @@ class TestAMPProxy(unittest.TestCase):
         
         Inspiration comes from twisted.test.test_amp
         """
-        self.pp = pool.ProcessPool()
+        conf = environment.DefaultConfiguration()
+        self.pp = pool.ProcessPool(conf)
         self.svc = service.AMPouleService(self.pp, child.AMPChild, 0, "")
         self.svc.startService()
         self.proxy_port = self.svc.server.getHost().port
