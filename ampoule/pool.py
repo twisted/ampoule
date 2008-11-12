@@ -10,7 +10,6 @@ pop = heapq.heappop
 from twisted.internet import defer, task
 from twisted.python import log
 
-from ampoule.main import startAMPProcess
 from ampoule import commands
 
 class ProcessPool(object):
@@ -41,21 +40,13 @@ class ProcessPool(object):
     started = False
     name = None
 
-    processFactory = staticmethod(startAMPProcess)
-    
-    def __init__(self, ampChild=None, ampParent=None, min=5, max=20,
-                 name=None, maxIdle=20, recycleAfter=500, childReactor="select"):
-        self.ampParent = ampParent
-        self.ampChild = ampChild
-        if ampChild is None:
-            from ampoule.child import AMPChild
-            self.ampChild = AMPChild
-        self.min = min
-        self.max = max
-        self.name = name
-        self.maxIdle = maxIdle
-        self.recycleAfter = recycleAfter
-        self.childReactor = childReactor
+    def __init__(self, conf):
+        self.conf = conf
+        self.min = conf.min
+        self.max = conf.max
+        self.name = conf.name
+        self.maxIdle = conf.maxIdle
+        self.recycleAfter = conf.recycleAfter
         self._queue = []
         
         self.processes = set()
@@ -65,7 +56,7 @@ class ProcessPool(object):
         self._lastUsage = {}
         self._calls = {}
         self.looping = task.LoopingCall(self._pruneProcesses)
-        self.looping.start(maxIdle, now=False)
+        self.looping.start(self.maxIdle, now=False)
     
     def start(self, ampChild=None):
         """
@@ -158,10 +149,7 @@ class ProcessPool(object):
             # You might end up with a dirty reactor due to the stop()
             # returning before the new process is created.
             return
-        child, finished = self.processFactory(self.ampChild,
-                                              ampParent=self.ampParent,
-                                              childReactor=self.childReactor,
-                                              packages=('twisted', 'ampoule'))
+        child, finished = self.conf.processFactory()
         return self._addProcess(child, finished)
     
     def _cb_doWork(self, command, _d=None, **kwargs):
@@ -215,6 +203,12 @@ class ProcessPool(object):
         return defer.maybeDeferred(child.callRemote, command, **kwargs
             ).addCallback(_returned, child
             ).addErrback(_returned, child, is_error=True)
+    
+    def callRemote(self, *args, **kwargs):
+        """
+        Proxy call to keep the API homogeneous across twisted's RPCs
+        """
+        return self.doWork(*args, **kwargs)
     
     def doWork(self, command, **kwargs):
         """
@@ -322,8 +316,9 @@ def deferToAMPProcess(command, **kwargs):
     
     @return: a L{defer.Deferred} with the data from the subprocess.
     """
+    from ampoule import environment
     global pp
     if pp is None:
-        pp = ProcessPool()
+        pp = ProcessPool(environment.DefaultConfiguration())
         return pp.start().addCallback(lambda _: pp.doWork(command, **kwargs))
     return pp.doWork(command, **kwargs)

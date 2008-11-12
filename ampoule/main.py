@@ -10,38 +10,7 @@ from twisted.protocols import amp
 
 gen = itertools.count()
 
-BOOTSTRAP = """\
-import sys
-
-def main(reactor, ampChildPath):
-    from twisted.application import reactors
-    reactors.installReactor(reactor)
-    
-    from twisted.python import log
-    log.startLogging(sys.stderr)
-
-    from twisted.internet import reactor, stdio
-    from twisted.python import reflect
-
-    ampChild = reflect.namedAny(ampChildPath)
-    stdio.StandardIO(ampChild(), 3, 4)
-    reactor.run()
-main(sys.argv[1], sys.argv[2])
-"""
-
-def _checkRoundTrip(obj): 
-    """
-    Make sure that an object will properly round-trip through 'qual' and
-    'namedAny'.
-
-    Raise a L{RuntimeError} if they aren't.
-    """
-    tripped = reflect.namedAny(reflect.qual(obj))
-    if tripped is not obj:
-        raise RuntimeError("importing %r is not the same as %r" %
-                           (reflect.qual(obj), obj))
-
-def startAMPProcess(ampChild, *args, **kwargs):
+def startAMPProcess(conf):
     """
     @param ampChild: a L{ampoule.child.AMPChild} subclass.
     @type ampChild: L{ampoule.child.AMPChild}
@@ -59,18 +28,9 @@ def startAMPProcess(ampChild, *args, **kwargs):
                          processes
     @type childReactor: L{str}
     """
-    _checkRoundTrip(ampChild)
-    fullPath = reflect.qual(ampChild)
-    ampParent = kwargs.pop('ampParent', None)
-    if ampParent is None:
-        ampParent = amp.AMP
-    childReactor = kwargs.pop('childReactor', None)
-    if childReactor is None:
-        childReactor = "select"
-    prot = AMPConnector(ampParent())
-    return startProcess(prot, childReactor, fullPath, *args, **kwargs)
+    return startProcess(conf, extraArgs=conf.args)
 
-def startProcess(prot, *args, **kwargs):
+def startProcess(conf, extraArgs=()):
     """
     @param prot: a L{protocol.ProcessProtocol} subclass
     @type prot: L{protocol.ProcessProtocol}
@@ -78,7 +38,10 @@ def startProcess(prot, *args, **kwargs):
     @return: a tuple of the child process and the deferred finished.
              finished triggers when the subprocess dies for any reason.
     """
-    spawnProcess(prot, tuple(args), **kwargs)
+    prot = conf.connector
+    spawnProcess(prot, conf.bootstrap,
+                    extraArgs + conf.spawnArgs, packages=conf.packages,
+                    **conf.kwargs)
     
     # XXX: we could wait for startup here, but ... is there really any
     # reason to?  the pipe should be ready for writing.  The subprocess
@@ -154,9 +117,9 @@ class AMPConnector(protocol.ProcessProtocol):
             return
         self.finished.errback(status)
 
-def spawnProcess(processProtocol, args=(), env={},
+def spawnProcess(processProtocol, bootstrap, args=(), env={},
                  path=None, uid=None, gid=None, usePTY=0,
-                 packages=(), bootstrap=BOOTSTRAP):
+                 packages=()):
     env = env.copy()
 
     pythonpath = []
