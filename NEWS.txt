@@ -1,3 +1,41 @@
+Ampoule 0.0.5 (2008-11-12)
+==========================
+
+Changes
+--------
+ - Fixed bug #259264, this fix introduces a number of changes in the
+   architecture of the project:
+    1. Removed childReactor argument form the process pool and added
+       a starter argument.
+    2. Introduced the concept of a starter object whose role is to
+       start subprocesses with given parameters. This makes it easier
+       to specify particular parameters (eg. new env variables) to the
+       child processes without needing to override many methods in the
+       pool using closures.
+    3. main.py is completely changed and now provides the ProcessStarter
+       object which is a default implementation of IStarter.
+    4. IStarter interface currently documents only 2 methods:
+            startAMPProcess
+            startPythonProcess
+        in the future it's possible that we will add an additional:
+            startProcess
+        that starts whichever process we want without requiring python,
+        also this might end up with the separation of ProcessPool in at
+        least 2 logical levels: the ProcessPool and a dispatcher that
+        talks with the children, in this way it would be possible to
+        create custom ProcessPools without changing much code or requiring
+        any special requirement on the children.
+
+ - Introduced a callRemote method on the ProcessPool that is basically
+   the same as doWork. Introduced for symmetry between all the RPC libraries
+   in Twisted.
+
+ - reactor short name and ampoule child class are now passed as the 2
+   last arguments rather than the first 2. So if you have written any
+   custom bootstrap code be sure to change sys.argv[1] and sys.argv[2]
+   into sys.argv[-2] and sys.argv[-1] respectively.
+
+
 Ampoule 0.0.4 (2008-11-03)
 ==========================
 
