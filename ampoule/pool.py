@@ -52,7 +52,7 @@ class ProcessPool(object):
                  name=None, maxIdle=20, recycleAfter=500, starter=None):
         self.starter = starter
         if starter is None:
-            self.starter = main.ProcessStarter()
+            self.starter = main.ProcessStarter(packages=("twisted", "ampoule"))
         self.ampParent = ampParent
         self.ampChild = ampChild
         if ampChild is None:
