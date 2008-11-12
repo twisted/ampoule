@@ -4,9 +4,13 @@ import imp
 import sets
 import itertools
 
+from zope.interface import implements
+
 from twisted.internet import reactor, protocol, defer, error
 from twisted.python import log, util, reflect
 from twisted.protocols import amp
+
+from ampoule import iampoule
 
 gen = itertools.count()
 
@@ -77,8 +81,6 @@ class AMPConnector(protocol.ProcessProtocol):
             return
         self.finished.errback(status)
 
-
-
 BOOTSTRAP = """\
 import sys
 
@@ -99,15 +101,44 @@ main(sys.argv[-2], sys.argv[-1])
 """
 
 class ProcessStarter(object):
-
+    
+    implements(iampoule.IStarter)
+    
     connectorFactory = AMPConnector
     def __init__(self, bootstrap=BOOTSTRAP, args=(), env={},
                  path=None, uid=None, gid=None, usePTY=0,
                  packages=(), childReactor="select"):
         """
+        @param bootstrap: Startup code for the child process
+        @type  bootstrap: C{str}
+        
+        @param args: Arguments that should be supplied to every child
+                     created.
+        @type args: C{tuple} of C{str}
+        
+        @param env: Environment variables that should be present in the
+                    child environment
+        @type env: C{dict}
+        
+        @param path: Path in which to run the child
+        @type path: C{str}
+        
+        @param uid: if defined, the uid used to run the new process.
+        @type uid: C{int}
+        
+        @param gid: if defined, the gid used to run the new process.
+        @type gid: C{int}
+        
+        @param usePTY: Should the child processes use PTY processes
+        @type usePTY: 0 or 1
+        
+        @param packages: A tuple of packages that should be guaranteed
+                         to be importable in the child processes
+        @type packages: C{tuple} of C{str}
+        
         @param childReactor: a string that sets the reactor for child
                              processes
-        @type childReactor: L{str}
+        @type childReactor: C{str}
         """
         self.bootstrap = bootstrap
         self.args = args
@@ -153,6 +184,9 @@ class ProcessStarter(object):
         """
         @param prot: a L{protocol.ProcessProtocol} subclass
         @type prot: L{protocol.ProcessProtocol}
+    
+        @param args: a tuple of arguments that will be added after the
+                     ones in L{self.args} to start the child process.
     
         @return: a tuple of the child process and the deferred finished.
                  finished triggers when the subprocess dies for any reason.

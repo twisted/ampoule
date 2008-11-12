@@ -23,19 +23,31 @@ class AMPChild(amp.AMP):
             # use sigprocmask?
             pass
         if not self.shutdown:
+            # if the shutdown wasn't explicit we presume that it's an
+            # error condition and thus we return a -1 error returncode.
             import os
             os._exit(-1)
 
     def shutdown(self):
+        """
+        This method is needed to shutdown the child gently without
+        generating an exception.
+        """
         log.msg("Shutdown message received, goodbye.")
         self.shutdown = True
         return {}
     Shutdown.responder(shutdown)
 
     def ping(self):
+        """
+        Ping the child and return an answer
+        """
         return {'response': "pong"}
     Ping.responder(ping)
 
     def echo(self, data):
+        """
+        Echo some data through the child.
+        """
         return {'response': data}
     Echo.responder(echo)

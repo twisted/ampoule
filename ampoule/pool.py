@@ -12,7 +12,6 @@ from twisted.python import log
 
 from ampoule import commands, main
 
-AMP, PYTHON = range(2)
 class ProcessPool(object):
     """
     This class generalizes the functionality of a pool of
@@ -30,20 +29,27 @@ class ProcessPool(object):
     
     @ivar maxIdle: Maximum number of seconds of indleness in a child
     
+    @ivar starter: A process starter that implements L{iampoule.IStarter}.
+    
     @ivar recycleAfter: Maximum number of calls before restarting a
                         subprocess, 0 to not recycle.
     
     @ivar childReactor: The shortName of the reactor to be used in
                         each child process
+    
+    @ivar ampChild: The child AMP protocol subclass with the commands
+                    that the child should implement.
+    
+    @ivar ampParent: The parent AMP protocol subclass with the commands
+                    that the parent should implement.
     """
 
     finished = False
     started = False
     name = None
-    childType = AMP
 
-    def __init__(self, starter=None, ampChild=None, ampParent=None,
-                 min=5, max=20, name=None, maxIdle=20, recycleAfter=500):
+    def __init__(self, ampChild=None, ampParent=None, min=5, max=20,
+                 name=None, maxIdle=20, recycleAfter=500, starter=None):
         self.starter = starter
         if starter is None:
             self.starter = main.ProcessStarter()
