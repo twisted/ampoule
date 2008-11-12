@@ -5,27 +5,13 @@ from twisted.internet import error, defer
 from twisted.python import failure, reflect
 from twisted.trial import unittest
 from twisted.protocols import amp
-from ampoule import main, child, commands, pool, environment
+from ampoule import main, child, commands, pool
 
 class ShouldntHaveBeenCalled(Exception):
     pass
 
 def _raise(_):
     raise ShouldntHaveBeenCalled(_)
-
-class TestConfiguration(environment.DefaultConfiguration):
-    pass
-
-class TestTransportConfiguration(TestConfiguration):
-    def __init__(self):
-        self.sio = sio()
-    
-    def getOutput(self):
-        return self.sio.getvalue()
-    
-    @property
-    def connector(self):
-        return main.AMPConnector(FakeAMP(self.sio))
 
 class _FakeT(object):
     closeStdinCalled = False
@@ -178,6 +164,8 @@ class TestAMPConnector(unittest.TestCase):
         Test that startProcess actually starts a subprocess and that
         it receives data back from the process through AMP.
         """
+        s = sio()
+        a = FakeAMP(s)
         STRING = "ciao"
         BOOT = """\
 import sys, os
@@ -185,23 +173,23 @@ def main(arg):
     os.write(4, arg)
 main(sys.argv[1])
 """
-        conf = TestTransportConfiguration()
-        conf.bootstrap = BOOT
-        conf.addArg(STRING)
-        conf.addPackage("twisted")
-        conf.addPackage("ampoule")
-        
-        amp, finished = main.startProcess(conf)
+        starter = main.ProcessStarter(bootstrap=BOOT,
+                                      args=(STRING,),
+                                      packages=("twisted", "ampoule"))
+
+        amp, finished = starter.startPythonProcess(main.AMPConnector(a))
         def _eb(reason):
             print reason
         finished.addErrback(_eb)
-        return finished.addCallback(lambda _: self.assertEquals(conf.getOutput(), STRING))
+        return finished.addCallback(lambda _: self.assertEquals(s.getvalue(), STRING))
     
     def test_failing_deferToProcess(self):
         """
         Test failing subprocesses and the way they terminate and preserve
         failing information.
         """
+        s = sio()
+        a = FakeAMP(s)
         STRING = "ciao"
         BOOT = """\
 import sys
@@ -209,17 +197,35 @@ def main(arg):
     raise Exception(arg)
 main(sys.argv[1])
 """
-        conf = TestConfiguration()
-        conf.bootstrap = BOOT
-        conf.addArg(STRING)
-        conf.addPackage("twisted")
-        conf.addPackage("ampoule")
-
-        ready, finished = main.startProcess(conf)
+        starter = main.ProcessStarter(bootstrap=BOOT, args=(STRING,), packages=("twisted", "ampoule"))
+        ready, finished = starter.startPythonProcess(main.AMPConnector(a), "I'll be ignored")
         
         self.assertFailure(finished, error.ProcessTerminated)
         finished.addErrback(lambda reason: self.assertEquals(reason.getMessage(), STRING))
         return finished
+
+    def test_env_setting(self):
+        """
+        Test that and environment variable passed to the process starter
+        is correctly passed to the child process.
+        """
+        s = sio()
+        a = FakeAMP(s)
+        STRING = "ciao"
+        BOOT = """\
+import sys, os
+def main():
+    os.write(4, os.getenv("FOOBAR"))
+main()
+"""
+        starter = main.ProcessStarter(bootstrap=BOOT,
+                                      packages=("twisted", "ampoule"),
+                                      env={"FOOBAR": STRING})
+        amp, finished = starter.startPythonProcess(main.AMPConnector(a), "I'll be ignored")
+        def _eb(reason):
+            print reason
+        finished.addErrback(_eb)
+        return finished.addCallback(lambda _: self.assertEquals(s.getvalue(), STRING))
 
     def test_startAMPProcess(self):
         """
@@ -227,12 +233,9 @@ main(sys.argv[1])
         accepts commands and correctly answers them.
         """
         STRING = "ciao"
-
-        conf = TestConfiguration()
-        conf.addPackage("twisted")
-        conf.addPackage("ampoule")
-
-        c, finished = main.startAMPProcess(conf)
+        
+        starter = main.ProcessStarter(packages=("twisted", "ampoule"))
+        c, finished = starter.startAMPProcess(child.AMPChild)
         c.callRemote(commands.Echo, data=STRING
            ).addCallback(lambda response:
                 self.assertEquals(response['response'], STRING)
@@ -252,13 +255,9 @@ main(sys.argv[1])
                 return {'response': DATA+APPEND}
             Pong.responder(pong)
         
-        conf = TestConfiguration()
-        conf.addPackage("twisted")
-        conf.addPackage("ampoule")
-        conf.ampParent = Parent
-        conf.ampChild = Child
+        starter = main.ProcessStarter(packages=("twisted", "ampoule"))
 
-        subp, finished = main.startAMPProcess(conf)
+        subp, finished = starter.startAMPProcess(ampChild=Child, ampParent=Parent)
         subp.callRemote(Ping, data=DATA
            ).addCallback(lambda response:
                 self.assertEquals(response['response'], DATA+APPEND)
@@ -273,26 +272,18 @@ main(sys.argv[1])
         class Child(child.AMPChild):
             pass
         
-        conf = TestConfiguration()
-        conf.addPackage("twisted")
-        conf.addPackage("ampoule")
-        conf.ampChild = Child
+        starter = main.ProcessStarter(packages=("twisted", "ampoule"))
 
-        self.assertRaises(RuntimeError, main.startAMPProcess, conf)
+        self.assertRaises(RuntimeError, starter.startAMPProcess, ampChild=Child)
 
 class TestProcessPool(unittest.TestCase):
-    def getConf(self, **kwargs):
-        conf = TestConfiguration()
-        for key, value in kwargs.iteritems():
-            setattr(conf, key, value)
-        return conf
         
     def test_startStopWorker(self):
         """
         Test that starting and stopping a worker keeps the state of
         the process pool consistent.
         """
-        pp = pool.ProcessPool(self.getConf())
+        pp = pool.ProcessPool()
         self.assertEquals(pp.started, False)
         self.assertEquals(pp.finished, False)
         self.assertEquals(pp.processes, set())
@@ -319,7 +310,7 @@ class TestProcessPool(unittest.TestCase):
         expected number of workers and keep state consistent in the
         process pool.
         """
-        pp = pool.ProcessPool(self.getConf())
+        pp = pool.ProcessPool()
         self.assertEquals(pp.started, False)
         self.assertEquals(pp.finished, False)
         self.assertEquals(pp.processes, set())
@@ -343,7 +334,7 @@ class TestProcessPool(unittest.TestCase):
         """
         Test that calls to pool.adjustPoolSize are correctly handled.
         """
-        pp = pool.ProcessPool(self.getConf(min=10))
+        pp = pool.ProcessPool(min=10)
         self.assertEquals(pp.started, False)
         self.assertEquals(pp.finished, False)
         self.assertEquals(pp.processes, set())
@@ -381,7 +372,7 @@ class TestProcessPool(unittest.TestCase):
         """
         Test that a failing child process is immediately restarted.
         """
-        pp = pool.ProcessPool(self.getConf(ampChild=BadChild, min=1))
+        pp = pool.ProcessPool(ampChild=BadChild, min=1)
         STRING = "DATA"
         
         def _checks(_):
@@ -409,7 +400,7 @@ class TestProcessPool(unittest.TestCase):
                 return {'response': DATA+APPEND}
             Pong.responder(pong)
         
-        pp = pool.ProcessPool(self.getConf(ampChild=Child, ampParent=Parent))
+        pp = pool.ProcessPool(ampChild=Child, ampParent=Parent)
         def _checks(_):
             return pp.doWork(Ping, data=DATA
                        ).addCallback(lambda response:
@@ -433,7 +424,7 @@ class TestProcessPool(unittest.TestCase):
         """
         Test that busy and ready lists are correctly maintained.
         """
-        pp = pool.ProcessPool(self.getConf(ampChild=WaitingChild))
+        pp = pool.ProcessPool(ampChild=WaitingChild)
         
         DATA = "foobar"
 
@@ -459,7 +450,7 @@ class TestProcessPool(unittest.TestCase):
         Test that the pool grows over time until it reaches max processes.
         """
         MAX = 5
-        pp = pool.ProcessPool(self.getConf(ampChild=WaitingChild, min=1, max=MAX))
+        pp = pool.ProcessPool(ampChild=WaitingChild, min=1, max=MAX)
 
         def _checks(_):
             self.assertEquals(pp.started, True)
@@ -491,7 +482,7 @@ class TestProcessPool(unittest.TestCase):
         MAX = 5
         MIN = 1
         IDLE = 1
-        pp = pool.ProcessPool(self.getConf(ampChild=WaitingChild, min=MIN, max=MAX, maxIdle=IDLE))
+        pp = pool.ProcessPool(ampChild=WaitingChild, min=MIN, max=MAX, maxIdle=IDLE)
                 
         def _checks(_):
             self.assertEquals(pp.started, True)
@@ -542,7 +533,7 @@ class TestProcessPool(unittest.TestCase):
         MAX = 1
         MIN = 1
         RECYCLE_AFTER = 1
-        pp = pool.ProcessPool(self.getConf(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER))
+        pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
         
         def _checks(_):
             self.assertEquals(pp.started, True)
@@ -574,7 +565,7 @@ class TestProcessPool(unittest.TestCase):
         MIN = 1
         RECYCLE_AFTER = 10
         CALLS = 60
-        pp = pool.ProcessPool(self.getConf(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER))
+        pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
         
         def _check(results):
             s = set()
@@ -597,7 +588,7 @@ class TestProcessPool(unittest.TestCase):
         MAX = 1
         MIN = 1
         RECYCLE_AFTER = 0
-        pp = pool.ProcessPool(self.getConf(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER))
+        pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
         
         def _checks(_):
             self.assertEquals(pp.started, True)
@@ -633,14 +624,14 @@ class TestProcessPool(unittest.TestCase):
         SECOND = "poll"
         
         def checkDefault():
-            pp = pool.ProcessPool(self.getConf(ampChild=ReactorChild, min=MIN, max=MAX, childReactor=FIRST))
+            pp = pool.ProcessPool(starter=main.ProcessStarter(childReactor=FIRST), ampChild=ReactorChild, min=MIN, max=MAX)
             pp.start()
             return pp.doWork(Reactor
                 ).addCallback(self.assertEquals, {'classname': "SelectReactor"}
                 ).addCallback(lambda _: pp.stop())
             
         def checkPool(_):
-            pp = pool.ProcessPool(self.getConf(ampChild=ReactorChild, min=MIN, max=MAX, childReactor=SECOND))
+            pp = pool.ProcessPool(starter=main.ProcessStarter(childReactor=SECOND), ampChild=ReactorChild, min=MIN, max=MAX)
             pp.start()
             return pp.doWork(Reactor
                 ).addCallback(self.assertEquals, {'classname': "PollReactor"}
@@ -659,7 +650,7 @@ class TestProcessPool(unittest.TestCase):
         actually don't have any problems.
         """
         DATA = "hello"
-        pp = pool.ProcessPool(self.getConf(ampChild=NoResponseChild, min=1, max=1))
+        pp = pool.ProcessPool(ampChild=NoResponseChild, min=1, max=1)
 
         def _check(_):
             return pp.doWork(GetResponse

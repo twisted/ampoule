@@ -10,8 +10,9 @@ pop = heapq.heappop
 from twisted.internet import defer, task
 from twisted.python import log
 
-from ampoule import commands
+from ampoule import commands, main
 
+AMP, PYTHON = range(2)
 class ProcessPool(object):
     """
     This class generalizes the functionality of a pool of
@@ -39,14 +40,23 @@ class ProcessPool(object):
     finished = False
     started = False
     name = None
+    childType = AMP
 
-    def __init__(self, conf):
-        self.conf = conf
-        self.min = conf.min
-        self.max = conf.max
-        self.name = conf.name
-        self.maxIdle = conf.maxIdle
-        self.recycleAfter = conf.recycleAfter
+    def __init__(self, starter=None, ampChild=None, ampParent=None,
+                 min=5, max=20, name=None, maxIdle=20, recycleAfter=500):
+        self.starter = starter
+        if starter is None:
+            self.starter = main.ProcessStarter()
+        self.ampParent = ampParent
+        self.ampChild = ampChild
+        if ampChild is None:
+            from ampoule.child import AMPChild
+            self.ampChild = AMPChild
+        self.min = min
+        self.max = max
+        self.name = name
+        self.maxIdle = maxIdle
+        self.recycleAfter = recycleAfter
         self._queue = []
         
         self.processes = set()
@@ -56,7 +66,7 @@ class ProcessPool(object):
         self._lastUsage = {}
         self._calls = {}
         self.looping = task.LoopingCall(self._pruneProcesses)
-        self.looping.start(self.maxIdle, now=False)
+        self.looping.start(maxIdle, now=False)
     
     def start(self, ampChild=None):
         """
@@ -149,7 +159,8 @@ class ProcessPool(object):
             # You might end up with a dirty reactor due to the stop()
             # returning before the new process is created.
             return
-        child, finished = self.conf.processFactory()
+        child, finished = self.starter.startAMPProcess(self.ampChild,
+                                                       ampParent=self.ampParent)
         return self._addProcess(child, finished)
     
     def _cb_doWork(self, command, _d=None, **kwargs):
@@ -316,9 +327,8 @@ def deferToAMPProcess(command, **kwargs):
     
     @return: a L{defer.Deferred} with the data from the subprocess.
     """
-    from ampoule import environment
     global pp
     if pp is None:
-        pp = ProcessPool(environment.DefaultConfiguration())
+        pp = ProcessPool()
         return pp.start().addCallback(lambda _: pp.doWork(command, **kwargs))
     return pp.doWork(command, **kwargs)

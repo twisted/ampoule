@@ -2,21 +2,6 @@ from twisted.protocols import amp
 from twisted.python import reflect
 from ampoule import child
 
-class Configuration(object):
-    ampChild = None
-    ampParent = None
-    childReactor = None
-    bootstrap = None
-    packages = None
-    min = None
-    max = None
-    name = None
-    maxIdle = None
-    recycleAfter = None
-    
-    def extraSpawnProcessArgs(self):
-        return {}
-
 BOOTSTRAP = """\
 import sys
 
@@ -36,7 +21,7 @@ def main(reactor, ampChildPath):
 main(sys.argv[1], sys.argv[2])
 """
 
-class DefaultConfiguration(Configuration):
+class DefaultConfiguration(object):
     ampChild = child.AMPChild
     ampParent = amp.AMP
     childReactor = "select"
@@ -50,16 +35,13 @@ class DefaultConfiguration(Configuration):
     _kwargs = {}
     _args = ()
     
-    def addArg(self, arg):
-        if isinstance(arg, dict):
-            self._kwargs.update(arg)
-        elif isinstance(arg, (list, tuple)):
-            self._args = self._args + arg
-        elif isinstance(arg, basestring):
-            self._args = self._args + (arg,)
+    def addArgs(self, *args, **kwargs):
+        self._args = self._args + args
+        self._kwargs.update(kwargs)
     
-    def addPackage(self, package):
-        self._packages.add(package)
+    def addPackages(self, *packages):
+        for package in packages:
+            self._packages.add(package)
     
     @property
     def packages(self):
@@ -68,11 +50,7 @@ class DefaultConfiguration(Configuration):
     @property
     def args(self):
         self._checkRoundTrip(self.ampChild)
-        return (self.childReactor, reflect.qual(self.ampChild))
-
-    @property
-    def spawnArgs(self):
-        return self._args
+        return (self.childReactor, reflect.qual(self.ampChild)) + self._args
     
     @property
     def kwargs(self):

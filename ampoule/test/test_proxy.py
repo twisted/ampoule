@@ -3,7 +3,7 @@ from twisted.internet.protocol import ClientFactory
 from twisted.trial import unittest
 from twisted.protocols import amp
 
-from ampoule import service, child, pool, environment
+from ampoule import service, child, pool, main
 from ampoule.commands import Echo
 
 class ClientAMP(amp.AMP):
@@ -22,8 +22,7 @@ class TestAMPProxy(unittest.TestCase):
         
         Inspiration comes from twisted.test.test_amp
         """
-        conf = environment.DefaultConfiguration()
-        self.pp = pool.ProcessPool(conf)
+        self.pp = pool.ProcessPool()
         self.svc = service.AMPouleService(self.pp, child.AMPChild, 0, "")
         self.svc.startService()
         self.proxy_port = self.svc.server.getHost().port

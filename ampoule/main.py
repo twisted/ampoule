@@ -10,46 +10,6 @@ from twisted.protocols import amp
 
 gen = itertools.count()
 
-def startAMPProcess(conf):
-    """
-    @param ampChild: a L{ampoule.child.AMPChild} subclass.
-    @type ampChild: L{ampoule.child.AMPChild}
-    
-    @param ampParent: an L{amp.AMP} subclass that implements the parent
-                      protocol for this process pool
-    @type ampParent: L{amp.AMP}
-    
-    @param args: a tuple of arguments that will be passed to the
-                 subprocess
-    @param kwargs: a dictionary that contains extra arguments for the
-                   spawnProcess call.
-    
-    @param childReactor: a string that sets the reactor for child
-                         processes
-    @type childReactor: L{str}
-    """
-    return startProcess(conf, extraArgs=conf.args)
-
-def startProcess(conf, extraArgs=()):
-    """
-    @param prot: a L{protocol.ProcessProtocol} subclass
-    @type prot: L{protocol.ProcessProtocol}
-    
-    @return: a tuple of the child process and the deferred finished.
-             finished triggers when the subprocess dies for any reason.
-    """
-    prot = conf.connector
-    spawnProcess(prot, conf.bootstrap,
-                    extraArgs + conf.spawnArgs, packages=conf.packages,
-                    **conf.kwargs)
-    
-    # XXX: we could wait for startup here, but ... is there really any
-    # reason to?  the pipe should be ready for writing.  The subprocess
-    # might not start up properly, but then, a subprocess might shut down
-    # at any point too. So we just return amp and have this piece to be
-    # synchronous.
-    return prot.amp, prot.finished
-
 class AMPConnector(protocol.ProcessProtocol):
     """
     A L{ProcessProtocol} subclass that can understand and speak AMP.
@@ -116,6 +76,97 @@ class AMPConnector(protocol.ProcessProtocol):
             self.finished.callback('')
             return
         self.finished.errback(status)
+
+
+
+BOOTSTRAP = """\
+import sys
+
+def main(reactor, ampChildPath):
+    from twisted.application import reactors
+    reactors.installReactor(reactor)
+    
+    from twisted.python import log
+    log.startLogging(sys.stderr)
+
+    from twisted.internet import reactor, stdio
+    from twisted.python import reflect
+
+    ampChild = reflect.namedAny(ampChildPath)
+    stdio.StandardIO(ampChild(), 3, 4)
+    reactor.run()
+main(sys.argv[-2], sys.argv[-1])
+"""
+
+class ProcessStarter(object):
+
+    connectorFactory = AMPConnector
+    def __init__(self, bootstrap=BOOTSTRAP, args=(), env={},
+                 path=None, uid=None, gid=None, usePTY=0,
+                 packages=(), childReactor="select"):
+        """
+        @param childReactor: a string that sets the reactor for child
+                             processes
+        @type childReactor: L{str}
+        """
+        self.bootstrap = bootstrap
+        self.args = args
+        self.env = env
+        self.path = path
+        self.uid = uid
+        self.gid = gid
+        self.usePTY = usePTY
+        self.packages = packages
+        self.childReactor = childReactor
+
+    def _checkRoundTrip(self, obj):
+        """
+        Make sure that an object will properly round-trip through 'qual' and
+        'namedAny'.
+
+        Raise a L{RuntimeError} if they aren't.
+        """
+        tripped = reflect.namedAny(reflect.qual(obj))
+        if tripped is not obj:
+            raise RuntimeError("importing %r is not the same as %r" %
+                               (reflect.qual(obj), obj))
+
+    def startAMPProcess(self, ampChild, ampParent=None):
+        """
+        @param ampChild: a L{ampoule.child.AMPChild} subclass.
+        @type ampChild: L{ampoule.child.AMPChild}
+    
+        @param ampParent: an L{amp.AMP} subclass that implements the parent
+                          protocol for this process pool
+        @type ampParent: L{amp.AMP}
+        """
+        self._checkRoundTrip(ampChild)
+        fullPath = reflect.qual(ampChild)
+        if ampParent is None:
+            ampParent = amp.AMP
+        prot = self.connectorFactory(ampParent())
+        
+        return self.startPythonProcess(prot, self.childReactor, fullPath)
+
+
+    def startPythonProcess(self, prot, *args):
+        """
+        @param prot: a L{protocol.ProcessProtocol} subclass
+        @type prot: L{protocol.ProcessProtocol}
+    
+        @return: a tuple of the child process and the deferred finished.
+                 finished triggers when the subprocess dies for any reason.
+        """
+        spawnProcess(prot, self.bootstrap, self.args+args, env=self.env,
+                     path=self.path, uid=self.uid, gid=self.gid,
+                     usePTY=self.usePTY, packages=self.packages)
+    
+        # XXX: we could wait for startup here, but ... is there really any
+        # reason to?  the pipe should be ready for writing.  The subprocess
+        # might not start up properly, but then, a subprocess might shut down
+        # at any point too. So we just return amp and have this piece to be
+        # synchronous.
+        return prot.amp, prot.finished
 
 def spawnProcess(processProtocol, bootstrap, args=(), env={},
                  path=None, uid=None, gid=None, usePTY=0,
