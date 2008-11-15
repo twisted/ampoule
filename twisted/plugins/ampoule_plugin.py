@@ -32,6 +32,7 @@ class AMPoulePlugin(object):
             ["max_idle", "d", 20, "Maximum number of idle seconds before killing a child", int],
             ["recycle", "r", 500, "Maximum number of calls before recycling a child", int],
             ["reactor", "R", "select", "Select the reactor for child processes"],
+            ["timeout", "t", None, "Specify a timeout value for ProcessPool calls", int]
         ]
 
         def postOptions(self):

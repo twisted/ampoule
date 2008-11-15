@@ -160,6 +160,28 @@ class ProcessStarter(object):
         self.packages = packages
         self.childReactor = childReactor
 
+    def __repr__(self):
+        """
+        Represent the ProcessStarter with a string.
+        """
+        return """ProcessStarter(bootstrap=%r,
+                                 args=%r,
+                                 env=%r,
+                                 path=%r,
+                                 uid=%r,
+                                 gid=%r,
+                                 usePTY=%r,
+                                 packages=%r,
+                                 childReactor=%r)""" % (self.bootstrap,
+                                                        self.args,
+                                                        self.env,
+                                                        self.path,
+                                                        self.uid,
+                                                        self.gid,
+                                                        self.usePTY,
+                                                        self.packages,
+                                                        self.childReactor)
+
     def _checkRoundTrip(self, obj):
         """
         Make sure that an object will properly round-trip through 'qual' and

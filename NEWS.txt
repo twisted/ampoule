@@ -1,3 +1,23 @@
+Ampoule 0.1 beta (2008-11-15)
+==========================
+
+Changes
+--------
+
+  - Fixed bug #276841: Add timeout for subprocess calls.
+     The ProcessPool constructor now supports an additional timeout
+     argument that specifies a pool level timeout, in seconds, before
+     which every call ever made should return. Alternatively there is
+     also a per-call mechanism. Currently this second per-call system
+     is not available when using the remote pool service, so be sure
+     to set the timeout command line parameter at an high enough level
+     to satisfy all the possible commands. If a command doesn't require
+     an answer the timeout doesn't apply, of course.
+     
+     The error returned when a call is timedout is 'error.ProcessTerminated'.
+     On *nix systems the process is terminated with signal 9, on windows
+     ampoule uses SIGTERM and returns error code 255.
+
 Ampoule 0.0.5 (2008-11-12)
 ==========================
 

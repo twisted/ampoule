@@ -21,9 +21,10 @@ def makeService(options):
     maxIdle = options['max_idle']
     recycle = options['recycle']
     childReactor = options['reactor']
+    timeout = options['timeout']
     
     starter = ProcessStarter(packages=("twisted", "ampoule"), childReactor=childReactor)
-    pp = ProcessPool(child, parent, min, max, name, maxIdle, recycle, starter)
+    pp = ProcessPool(child, parent, min, max, name, maxIdle, recycle, starter, timeout)
     svc = AMPouleService(pp, child, ampport, ampinterface)
     svc.setServiceParent(ms)
 

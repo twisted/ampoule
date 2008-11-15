@@ -41,9 +41,6 @@ class ProcessPool(object):
     @ivar recycleAfter: Maximum number of calls before restarting a
                         subprocess, 0 to not recycle.
     
-    @ivar childReactor: The shortName of the reactor to be used in
-                        each child process
-    
     @ivar ampChild: The child AMP protocol subclass with the commands
                     that the child should implement.
     
@@ -359,6 +356,7 @@ class ProcessPool(object):
                 yield self.stopAWorker()
             while len(self.processes) < self.min:
                 self.startAWorker()
+        self.dumpStats()
 
     @defer.inlineCallbacks
     def stop(self):
@@ -373,7 +371,15 @@ class ProcessPool(object):
             self.looping.stop()
 
     def dumpStats(self):
-        log.msg('workers: %s' % len(self.processes))
+        log.msg("ProcessPool stats:")
+        log.msg('\tworkers: %s' % len(self.processes))
+        log.msg('\ttimeout: %s' % (self.timeout))
+        log.msg('\tparent: %r' % (self.ampParent,))
+        log.msg('\tchild: %r' % (self.ampChild,))
+        log.msg('\tmax idle: %r' % (self.maxIdle,))
+        log.msg('\trecycle after: %r' % (self.recycleAfter,))
+        log.msg('\tProcessStarter:')
+        log.msg('\t\t%r' % (self.starter,))
 
 pp = None
 

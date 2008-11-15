@@ -121,6 +121,16 @@ class BadChild(child.AMPChild):
     Die.responder(die)
 
 class TestAMPConnector(unittest.TestCase):
+    def setUp(self):
+        """
+        The only reason why this method exists is to let 'trial ampoule'
+        to install the signal handlers (#3178 for reference).
+        """
+        super(TestAMPConnector, self).setUp()
+        d = defer.Deferred()
+        reactor.callLater(0, d.callback, None)
+        return d
+
     def _makeConnector(self, s, sa):
         a = FakeAMP(sa)
         ac = main.AMPConnector(a)
@@ -673,6 +683,22 @@ class TestProcessPool(unittest.TestCase):
         
         def _work(_):
             d = pp.callRemote(First, data="ciao", _timeout=1)
+            self.assertFailure(d, error.ProcessTerminated)
+            return d
+
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(lambda _: pp.stop())
+
+    def test_processGlobalTimeout(self):
+        """
+        Test that a call that doesn't finish within the given global
+        timeout time is correctly handled.
+        """
+        pp = pool.ProcessPool(WaitingChild, min=1, max=1, timeout=1)
+        
+        def _work(_):
+            d = pp.callRemote(First, data="ciao")
             self.assertFailure(d, error.ProcessTerminated)
             return d
 
