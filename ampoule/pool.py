@@ -2,15 +2,22 @@ import time
 import random
 import heapq
 import itertools
+import signal
 choice = random.choice
 now = time.time
 count = itertools.count().next
 pop = heapq.heappop
 
-from twisted.internet import defer, task
-from twisted.python import log
+from twisted.internet import defer, task, error
+from twisted.python import log, failure
 
 from ampoule import commands, main
+
+try:
+    DIE = signal.SIGKILL
+except AttributeError:
+    # Windows doesn't have SIGKILL, let's just use SIGTERM then
+    DIE = signal.SIGTERM
 
 class ProcessPool(object):
     """
@@ -42,6 +49,9 @@ class ProcessPool(object):
     
     @ivar ampParent: The parent AMP protocol subclass with the commands
                     that the parent should implement.
+    
+    @ivar timeout: The general timeout (in seconds) for every child
+                    process call.
     """
 
     finished = False
@@ -49,7 +59,8 @@ class ProcessPool(object):
     name = None
 
     def __init__(self, ampChild=None, ampParent=None, min=5, max=20,
-                 name=None, maxIdle=20, recycleAfter=500, starter=None):
+                 name=None, maxIdle=20, recycleAfter=500, starter=None,
+                 timeout=None):
         self.starter = starter
         if starter is None:
             self.starter = main.ProcessStarter(packages=("twisted", "ampoule"))
@@ -63,6 +74,7 @@ class ProcessPool(object):
         self.name = name
         self.maxIdle = maxIdle
         self.recycleAfter = recycleAfter
+        self.timeout = timeout
         self._queue = []
         
         self.processes = set()
@@ -113,9 +125,9 @@ class ProcessPool(object):
         self.processes.discard(child)
         self.ready.discard(child)
         self.busy.discard(child)
-        self._finishCallbacks.pop(child, None)
         self._lastUsage.pop(child, None)
         self._calls.pop(child, None)
+        self._finishCallbacks.pop(child, None)
     
     def _addProcess(self, child, finished):
         """
@@ -147,6 +159,20 @@ class ProcessPool(object):
             _, (d, command, kwargs) = pop(self._queue)
             self._cb_doWork(command, _d=d, **kwargs)
     
+    def _handleTimeout(self, child):
+        """
+        One of the children went timeout, we need to deal with it
+        
+        @param child: The child process
+        @type child: L{child.AMPChild}
+        """
+        try:
+            child.transport.signalProcess(DIE)
+        except error.ProcessExitedAlready:
+            # don't do anything then... we are too late
+            # or we were too early to call
+            pass
+    
     def startAWorker(self):
         """
         Start a worker and set it up in the system.
@@ -169,7 +195,7 @@ class ProcessPool(object):
                                                        ampParent=self.ampParent)
         return self._addProcess(child, finished)
     
-    def _cb_doWork(self, command, _d=None, **kwargs):
+    def _cb_doWork(self, command, _d=None, _timeout=None, **kwargs):
         """
         Go and call the command.
         
@@ -178,8 +204,15 @@ class ProcessPool(object):
         
         @param _d: The deferred for the calling code.
         @type _d: L{defer.Deferred}
+        
+        @param _timeout: The timeout for this call only
+        @type _timeout: C{int}
         """
+        timeoutCall = None
+        
         def _returned(result, child, is_error=False):
+            if timeoutCall is not None and timeoutCall.active():
+                timeoutCall.cancel()
             self.busy.discard(child)
             if not die:
                 # we are not marked to be removed, so add us back to
@@ -217,6 +250,17 @@ class ProcessPool(object):
 
         # If the command doesn't require a response then callRemote
         # returns nothing, so we prepare for that too.
+        # We also need to guard against timeout errors for child
+        # and local timeout parameter overrides the global one
+        if _timeout == 0:
+            timeout = timeout
+        else:
+            timeout = _timeout or self.timeout
+
+        if timeout is not None:
+            from twisted.internet import reactor
+            timeoutCall = reactor.callLater(timeout, self._handleTimeout, child)
+
         return defer.maybeDeferred(child.callRemote, command, **kwargs
             ).addCallback(_returned, child
             ).addErrback(_returned, child, is_error=True)
@@ -271,7 +315,18 @@ class ProcessPool(object):
                 child = self.ready.pop()
             else:
                 child = choice(list(self.processes))
-        child.callRemote(commands.Shutdown)
+        child.callRemote(commands.Shutdown
+            # This is needed for timeout handling, the reason is pretty hard
+            # to explain but I'll try to:
+            # There's another small race condition in the system. If the
+            # child process is shut down by a signal and you try to stop
+            # the process pool immediately afterwards, like tests would do,
+            # the child AMP object would still be in the system and trying
+            # to call the command Shutdown on it would result in the same
+            # errback that we got originally, for this reason we need to
+            # trap it now so that it doesn't raise by not being handled.
+            # Does this even make sense to you?
+            ).addErrback(lambda reason: reason.trap(error.ProcessTerminated))
         return self._finishCallbacks[child]
     
     def _startSomeWorkers(self):

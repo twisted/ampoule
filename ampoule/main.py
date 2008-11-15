@@ -42,6 +42,16 @@ class AMPConnector(protocol.ProcessProtocol):
         if name is None:
             self.name = gen.next()
 
+    def signalProcess(self, signalID):
+        """
+        Send the signal signalID to the child process
+        
+        @param signalID: The signal ID that you want to send to the
+                        corresponding child
+        @type signalID: C{str} or C{int}
+        """
+        return self.transport.signalProcess(signalID)
+
     def connectionMade(self):
         log.msg("Subprocess %s started." % (self.name,))
         self.amp.makeConnection(self)

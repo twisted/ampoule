@@ -1,7 +1,7 @@
 import math
 from cStringIO import StringIO as sio
 
-from twisted.internet import error, defer
+from twisted.internet import error, defer, reactor
 from twisted.python import failure, reflect
 from twisted.trial import unittest
 from twisted.protocols import amp
@@ -662,4 +662,20 @@ class TestProcessPool(unittest.TestCase):
         return pp.start(
             ).addCallback(_work
             ).addCallback(_check
+            ).addCallback(lambda _: pp.stop())
+
+    def test_processTimeout(self):
+        """
+        Test that a call that doesn't finish within the given timeout
+        time is correctly handled.
+        """
+        pp = pool.ProcessPool(WaitingChild, min=1, max=1)
+        
+        def _work(_):
+            d = pp.callRemote(First, data="ciao", _timeout=1)
+            self.assertFailure(d, error.ProcessTerminated)
+            return d
+
+        return pp.start(
+            ).addCallback(_work
             ).addCallback(lambda _: pp.stop())
