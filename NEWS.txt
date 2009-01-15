@@ -1,3 +1,13 @@
+Ampoule 0.1.1 (XXXX-XX-XX)
+==========================
+
+Changes
+--------
+  - Fixed bug #317287: Twisted was required by setup.py due to import
+      of application code to get the version number. The setup.py now
+      tries to do the same thing but if it fails it uses a separate
+      hardcoded version.
+
 Ampoule 0.1 (2008-11-15)
 ==========================
 
