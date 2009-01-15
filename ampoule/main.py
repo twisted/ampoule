@@ -9,10 +9,20 @@ from zope.interface import implements
 from twisted.internet import reactor, protocol, defer, error
 from twisted.python import log, util, reflect
 from twisted.protocols import amp
+from twisted.python import runtime
 
 from ampoule import iampoule
 
 gen = itertools.count()
+
+if runtime.platform.isWindows():
+    IS_WINDOWS = True
+    TO_CHILD = 0
+    FROM_CHILD = 1
+else:
+    IS_WINDOWS = False
+    TO_CHILD = 3
+    FROM_CHILD = 4
 
 class AMPConnector(protocol.ProcessProtocol):
     """
@@ -60,11 +70,11 @@ class AMPConnector(protocol.ProcessProtocol):
     disconnecting = False
 
     def write(self, data):
-        self.transport.writeToChild(3, data)
+        self.transport.writeToChild(TO_CHILD, data)
 
     def loseConnection(self):
-        self.transport.closeChildFD(3)
-        self.transport.closeChildfd(4)
+        self.transport.closeChildFD(TO_CHILD)
+        self.transport.closeChildfd(FROM_CHILD)
         self.transport.loseConnection()
 
     def getPeer(self):
@@ -74,7 +84,7 @@ class AMPConnector(protocol.ProcessProtocol):
         return ('no host',)
 
     def childDataReceived(self, childFD, data):
-        if childFD == 4:
+        if childFD == FROM_CHILD:
             self.amp.dataReceived(data)
             return
         self.errReceived(data)
@@ -105,10 +115,10 @@ def main(reactor, ampChildPath):
     from twisted.python import reflect
 
     ampChild = reflect.namedAny(ampChildPath)
-    stdio.StandardIO(ampChild(), 3, 4)
+    stdio.StandardIO(ampChild(), %s, %s)
     reactor.run()
 main(sys.argv[-2], sys.argv[-1])
-"""
+""" % (TO_CHILD, FROM_CHILD)
 
 class ProcessStarter(object):
     
@@ -255,6 +265,10 @@ def spawnProcess(processProtocol, bootstrap, args=(), env={},
     # that I'm using here, 3 and 4, so we are going to fix all these
     # issues when I add support for the configuration object that can
     # fix this stuff in a more configurable way.
-    return reactor.spawnProcess(processProtocol, sys.executable, args,
-                                env, path, uid, gid, usePTY,
-                                childFDs={0:"w", 1:"r", 2:"r", 3:"w", 4:"r"})
+    if IS_WINDOWS:
+        return reactor.spawnProcess(processProtocol, sys.executable, args,
+                                    env, path, uid, gid, usePTY)
+    else:
+        return reactor.spawnProcess(processProtocol, sys.executable, args,
+                                    env, path, uid, gid, usePTY,
+                                    childFDs={0:"w", 1:"r", 2:"r", 3:"w", 4:"r"})
