@@ -16,7 +16,11 @@ except ImportError:
 # For great justice, take off every zig.
 import sys, os, pprint, traceback
 
-import ampoule
+try:
+    import ampoule
+    version = ampoule.__version__
+except ImportError:
+    version = "0.1.1"
 
 install_requires = ["Twisted>=8.0.1"]
 
@@ -112,7 +116,7 @@ autosetup(
     description = description,
     long_description = long_description,
     license = "MIT License",
-    version=ampoule.__version__,
+    version=version,
     install_requires=install_requires,
     url="https://launchpad.net/ampoule",
     classifiers = [
