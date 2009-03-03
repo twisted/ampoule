@@ -366,12 +366,9 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(len(pp._finishCallbacks), pp.max)
         
         def _resize3(_):
-            return self.assertFailure(pp.adjustPoolSize(min=-1, max=5), AssertionError
-                ).addCallback(lambda _:
-                    self.assertFailure(pp.adjustPoolSize(min=5, max=1), AssertionError)
-                ).addCallback(lambda _:
-                    pp.stop()
-                )
+            self.assertRaises(AssertionError, pp.adjustPoolSize, min=-1, max=5)
+            self.assertRaises(AssertionError, pp.adjustPoolSize, min=5, max=1)
+            return pp.stop()
         
         return pp.start(
             ).addCallback(_resize1

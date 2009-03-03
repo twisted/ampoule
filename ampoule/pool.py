@@ -333,7 +333,6 @@ class ProcessPool(object):
         if len(self.processes) < self.max:
             self.startAWorker()
 
-    @defer.inlineCallbacks
     def adjustPoolSize(self, min=None, max=None):
         """
         Change the pool size to be at least min and less than max,
@@ -351,24 +350,27 @@ class ProcessPool(object):
         self.min = min
         self.max = max
         
+        l = []
         if self.started:
-            while len(self.processes) > self.max:
-                yield self.stopAWorker()
+            
+            for i in xrange(len(self.processes)-self.max):
+                l.append(self.stopAWorker())
             while len(self.processes) < self.min:
                 self.startAWorker()
-        self.dumpStats()
+        
+        return defer.DeferredList(l).addCallback(lambda _: self.dumpStats())
 
-    @defer.inlineCallbacks
     def stop(self):
         """
         Stops the process protocol.
         """
         self.finished = True
         l = [self.stopAWorker(process) for process in self.processes]
-        d = defer.DeferredList(l)
-        yield d
-        if self.looping.running:
-            self.looping.stop()
+        def _cb(_):
+            if self.looping.running:
+                self.looping.stop()
+
+        return defer.DeferredList(l).addCallback(_cb)
 
     def dumpStats(self):
         log.msg("ProcessPool stats:")
