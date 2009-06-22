@@ -30,7 +30,7 @@ class AMPConnector(protocol.ProcessProtocol):
 
     @ivar amp: the children AMP process
     @type amp: L{amp.AMP}
-    
+
     @ivar finished: a deferred triggered when the process dies.
     @type finished: L{defer.Deferred}
 
@@ -42,7 +42,7 @@ class AMPConnector(protocol.ProcessProtocol):
         """
         @param proto: An instance or subclass of L{amp.AMP}
         @type proto: L{amp.AMP}
-        
+
         @param name: optional name of the subprocess.
         @type name: int
         """
@@ -55,7 +55,7 @@ class AMPConnector(protocol.ProcessProtocol):
     def signalProcess(self, signalID):
         """
         Send the signal signalID to the child process
-        
+
         @param signalID: The signal ID that you want to send to the
                         corresponding child
         @type signalID: C{str} or C{int}
@@ -65,16 +65,19 @@ class AMPConnector(protocol.ProcessProtocol):
     def connectionMade(self):
         log.msg("Subprocess %s started." % (self.name,))
         self.amp.makeConnection(self)
-        
+
     # Transport
     disconnecting = False
 
     def write(self, data):
-        self.transport.writeToChild(TO_CHILD, data)
+        if IS_WINDOWS:
+            self.transport.write(data)
+        else:
+            self.transport.writeToChild(TO_CHILD, data)
 
     def loseConnection(self):
         self.transport.closeChildFD(TO_CHILD)
-        self.transport.closeChildfd(FROM_CHILD)
+        self.transport.closeChildFD(FROM_CHILD)
         self.transport.loseConnection()
 
     def getPeer(self):
@@ -107,7 +110,7 @@ import sys
 def main(reactor, ampChildPath):
     from twisted.application import reactors
     reactors.installReactor(reactor)
-    
+
     from twisted.python import log
     log.startLogging(sys.stderr)
 
@@ -121,9 +124,9 @@ main(sys.argv[-2], sys.argv[-1])
 """ % (TO_CHILD, FROM_CHILD)
 
 class ProcessStarter(object):
-    
+
     implements(iampoule.IStarter)
-    
+
     connectorFactory = AMPConnector
     def __init__(self, bootstrap=BOOTSTRAP, args=(), env={},
                  path=None, uid=None, gid=None, usePTY=0,
@@ -131,31 +134,31 @@ class ProcessStarter(object):
         """
         @param bootstrap: Startup code for the child process
         @type  bootstrap: C{str}
-        
+
         @param args: Arguments that should be supplied to every child
                      created.
         @type args: C{tuple} of C{str}
-        
+
         @param env: Environment variables that should be present in the
                     child environment
         @type env: C{dict}
-        
+
         @param path: Path in which to run the child
         @type path: C{str}
-        
+
         @param uid: if defined, the uid used to run the new process.
         @type uid: C{int}
-        
+
         @param gid: if defined, the gid used to run the new process.
         @type gid: C{int}
-        
+
         @param usePTY: Should the child processes use PTY processes
         @type usePTY: 0 or 1
-        
+
         @param packages: A tuple of packages that should be guaranteed
                          to be importable in the child processes
         @type packages: C{tuple} of C{str}
-        
+
         @param childReactor: a string that sets the reactor for child
                              processes
         @type childReactor: C{str}
@@ -208,7 +211,7 @@ class ProcessStarter(object):
         """
         @param ampChild: a L{ampoule.child.AMPChild} subclass.
         @type ampChild: L{ampoule.child.AMPChild}
-    
+
         @param ampParent: an L{amp.AMP} subclass that implements the parent
                           protocol for this process pool
         @type ampParent: L{amp.AMP}
@@ -218,7 +221,7 @@ class ProcessStarter(object):
         if ampParent is None:
             ampParent = amp.AMP
         prot = self.connectorFactory(ampParent())
-        
+
         return self.startPythonProcess(prot, self.childReactor, fullPath)
 
 
@@ -226,17 +229,17 @@ class ProcessStarter(object):
         """
         @param prot: a L{protocol.ProcessProtocol} subclass
         @type prot: L{protocol.ProcessProtocol}
-    
+
         @param args: a tuple of arguments that will be added after the
                      ones in L{self.args} to start the child process.
-    
+
         @return: a tuple of the child process and the deferred finished.
                  finished triggers when the subprocess dies for any reason.
         """
         spawnProcess(prot, self.bootstrap, self.args+args, env=self.env,
                      path=self.path, uid=self.uid, gid=self.gid,
                      usePTY=self.usePTY, packages=self.packages)
-    
+
         # XXX: we could wait for startup here, but ... is there really any
         # reason to?  the pipe should be ready for writing.  The subprocess
         # might not start up properly, but then, a subprocess might shut down
