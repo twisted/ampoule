@@ -9,6 +9,8 @@ Changes
       hardcoded version.
   - Fixed bug #317077: Ampoule didn't work on windows xp due to childFD
       customization, now on windows ampoule uses the standard 0,1,2 fds.
+  - Added pyOpenSSL as an explicit dependency since Twisted doesn't
+    require it but AMP does.
 
 Ampoule 0.1 (2008-11-15)
 ==========================
