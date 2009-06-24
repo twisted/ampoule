@@ -22,7 +22,7 @@ try:
 except ImportError:
     version = "0.1.1"
 
-install_requires = ["Twisted>=8.0.1"]
+install_requires = ["Twisted>=8.0.1", "pyOpenSSL"]
 
 setup = setuptools.setup
 find_packages = setuptools.find_packages
