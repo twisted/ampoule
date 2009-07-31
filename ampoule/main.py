@@ -115,10 +115,13 @@ def main(reactor, ampChildPath):
     log.startLogging(sys.stderr)
 
     from twisted.internet import reactor, stdio
-    from twisted.python import reflect
+    from twisted.python import reflect, runtime
 
     ampChild = reflect.namedAny(ampChildPath)
-    stdio.StandardIO(ampChild(), %s, %s)
+    if runtime.platform.isWindows():
+        stdio.StandardIO(ampChild())
+    else:
+        stdio.StandardIO(ampChild(), %s, %s)
     reactor.run()
 main(sys.argv[-2], sys.argv[-1])
 """ % (TO_CHILD, FROM_CHILD)
