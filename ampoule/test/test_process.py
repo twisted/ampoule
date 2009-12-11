@@ -1,3 +1,4 @@
+from signal import SIGHUP
 import math
 from cStringIO import StringIO as sio
 
@@ -695,6 +696,27 @@ class TestProcessPool(unittest.TestCase):
         Test that the process is correctly handled when the timeout is zero.
         """
         return self.processTimeoutTest(0)
+
+    def test_processTimeoutSignal(self):
+        """
+        Test that a call that doesn't finish within the given timeout
+        time is correctly handled.
+        """
+        pp = pool.ProcessPool(WaitingChild, min=1, max=1,
+                              timeout_signal=SIGHUP)
+        
+        def _work(_):
+            d = pp.callRemote(First, data="ciao", _timeout=1)
+            d.addCallback(lambda d: self.fail())
+            text = 'signal %d' % SIGHUP
+            d.addErrback(
+                lambda f: self.assertTrue(text in f.value[0],
+                '"%s" not in "%s"' % (text, f.value[0])))
+            return d
+
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(lambda _: pp.stop())
 
     def test_processGlobalTimeout(self):
         """
