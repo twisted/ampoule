@@ -250,7 +250,7 @@ class ProcessPool(object):
         # We also need to guard against timeout errors for child
         # and local timeout parameter overrides the global one
         if _timeout == 0:
-            timeout = timeout
+            timeout = _timeout
         else:
             timeout = _timeout or self.timeout
 

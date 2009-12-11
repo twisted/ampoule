@@ -671,21 +671,30 @@ class TestProcessPool(unittest.TestCase):
             ).addCallback(_check
             ).addCallback(lambda _: pp.stop())
 
-    def test_processTimeout(self):
-        """
-        Test that a call that doesn't finish within the given timeout
-        time is correctly handled.
-        """
+    def processTimeoutTest(self, timeout):
         pp = pool.ProcessPool(WaitingChild, min=1, max=1)
         
         def _work(_):
-            d = pp.callRemote(First, data="ciao", _timeout=1)
+            d = pp.callRemote(First, data="ciao", _timeout=timeout)
             self.assertFailure(d, error.ProcessTerminated)
             return d
 
         return pp.start(
             ).addCallback(_work
             ).addCallback(lambda _: pp.stop())
+
+    def test_processTimeout(self):
+        """
+        Test that a call that doesn't finish within the given timeout
+        time is correctly handled.
+        """
+        return self.processTimeoutTest(1)
+
+    def test_processTimeoutZero(self):
+        """
+        Test that the process is correctly handled when the timeout is zero.
+        """
+        return self.processTimeoutTest(0)
 
     def test_processGlobalTimeout(self):
         """
