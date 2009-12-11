@@ -57,7 +57,7 @@ class ProcessPool(object):
 
     def __init__(self, ampChild=None, ampParent=None, min=5, max=20,
                  name=None, maxIdle=20, recycleAfter=500, starter=None,
-                 timeout=None):
+                 timeout=None, timeout_signal=DIE):
         self.starter = starter
         if starter is None:
             self.starter = main.ProcessStarter(packages=("twisted", "ampoule"))
@@ -72,6 +72,7 @@ class ProcessPool(object):
         self.maxIdle = maxIdle
         self.recycleAfter = recycleAfter
         self.timeout = timeout
+        self.timeout_signal = timeout_signal
         self._queue = []
         
         self.processes = set()
@@ -164,7 +165,7 @@ class ProcessPool(object):
         @type child: L{child.AMPChild}
         """
         try:
-            child.transport.signalProcess(DIE)
+            child.transport.signalProcess(self.timeout_signal)
         except error.ProcessExitedAlready:
             # don't do anything then... we are too late
             # or we were too early to call
