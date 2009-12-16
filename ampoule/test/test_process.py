@@ -121,6 +121,23 @@ class BadChild(child.AMPChild):
         return {}
     Die.responder(die)
 
+
+class Write(amp.Command):
+    response = [("response", amp.String())]
+    pass
+
+
+class Writer(child.AMPChild):
+
+    def __init__(self, data='hello'):
+        child.AMPChild.__init__(self)
+        self.data = data
+
+    def write(self):
+        return {'response': self.data}
+    Write.responder(write)
+
+
 class TestAMPConnector(unittest.TestCase):
     def setUp(self):
         """
@@ -669,6 +686,17 @@ class TestProcessPool(unittest.TestCase):
 
         return pp.start(
             ).addCallback(_work
+            ).addCallback(_check
+            ).addCallback(lambda _: pp.stop())
+
+    def test_SupplyChildArgs(self):
+        """Ensure that arguments for the child constructor are passed in."""
+        pp = pool.ProcessPool(Writer, ampChildArgs=['body'], min=0)
+        def _check(result):
+            return pp.doWork(Write).addCallback(
+            self.assertEquals, {'response': 'body'})
+
+        return pp.start(
             ).addCallback(_check
             ).addCallback(lambda _: pp.stop())
 

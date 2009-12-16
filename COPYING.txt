@@ -1,6 +1,7 @@
 Copyright (c) 2008
 Valentino Volonghi
 Matthew Lefkowitz
+Copyright (c) 2009 Canonical Ltd.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
