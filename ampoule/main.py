@@ -119,9 +119,9 @@ def main(reactor, ampChildPath):
 
     ampChild = reflect.namedAny(ampChildPath)
     if runtime.platform.isWindows():
-        stdio.StandardIO(ampChild())
+        stdio.StandardIO(ampChild(*sys.argv[1:-2]))
     else:
-        stdio.StandardIO(ampChild(), %s, %s)
+        stdio.StandardIO(ampChild(*sys.argv[1:-2]), %s, %s)
     reactor.run()
 main(sys.argv[-2], sys.argv[-1])
 """ % (TO_CHILD, FROM_CHILD)
@@ -210,7 +210,7 @@ class ProcessStarter(object):
             raise RuntimeError("importing %r is not the same as %r" %
                                (reflect.qual(obj), obj))
 
-    def startAMPProcess(self, ampChild, ampParent=None):
+    def startAMPProcess(self, ampChild, ampParent=None, ampChildArgs=()):
         """
         @param ampChild: a L{ampoule.child.AMPChild} subclass.
         @type ampChild: L{ampoule.child.AMPChild}
@@ -224,8 +224,8 @@ class ProcessStarter(object):
         if ampParent is None:
             ampParent = amp.AMP
         prot = self.connectorFactory(ampParent())
-
-        return self.startPythonProcess(prot, self.childReactor, fullPath)
+        args = ampChildArgs + (self.childReactor, fullPath)
+        return self.startPythonProcess(prot, *args)
 
 
     def startPythonProcess(self, prot, *args):

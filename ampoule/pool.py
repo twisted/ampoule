@@ -57,8 +57,9 @@ class ProcessPool(object):
 
     def __init__(self, ampChild=None, ampParent=None, min=5, max=20,
                  name=None, maxIdle=20, recycleAfter=500, starter=None,
-                 timeout=None, timeout_signal=DIE):
+                 timeout=None, timeout_signal=DIE, ampChildArgs=()):
         self.starter = starter
+        self.ampChildArgs = tuple(ampChildArgs)
         if starter is None:
             self.starter = main.ProcessStarter(packages=("twisted", "ampoule"))
         self.ampParent = ampParent
@@ -189,8 +190,10 @@ class ProcessPool(object):
             # You might end up with a dirty reactor due to the stop()
             # returning before the new process is created.
             return
-        child, finished = self.starter.startAMPProcess(self.ampChild,
-                                                       ampParent=self.ampParent)
+        startAMPProcess = self.starter.startAMPProcess
+        child, finished = startAMPProcess(self.ampChild,
+                                          ampParent=self.ampParent,
+                                          ampChildArgs=self.ampChildArgs)
         return self._addProcess(child, finished)
     
     def _cb_doWork(self, command, _d=None, _timeout=None, _deadline=None,
