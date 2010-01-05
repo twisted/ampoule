@@ -193,7 +193,8 @@ class ProcessPool(object):
                                                        ampParent=self.ampParent)
         return self._addProcess(child, finished)
     
-    def _cb_doWork(self, command, _d=None, _timeout=None, **kwargs):
+    def _cb_doWork(self, command, _d=None, _timeout=None, _deadline=None,
+                   **kwargs):
         """
         Go and call the command.
         
@@ -205,12 +206,18 @@ class ProcessPool(object):
         
         @param _timeout: The timeout for this call only
         @type _timeout: C{int}
+        @param _deadline: The deadline for this call only
+        @type _deadline: C{int}
         """
         timeoutCall = None
+        deadlineCall = None
         
         def _returned(result, child, is_error=False):
-            if timeoutCall is not None and timeoutCall.active():
-                timeoutCall.cancel()
+            def cancelCall(call):
+                if call is not None and call.active():
+                    call.cancel()
+            cancelCall(timeoutCall)
+            cancelCall(deadlineCall)
             self.busy.discard(child)
             if not die:
                 # we are not marked to be removed, so add us back to
@@ -258,6 +265,12 @@ class ProcessPool(object):
         if timeout is not None:
             from twisted.internet import reactor
             timeoutCall = reactor.callLater(timeout, self._handleTimeout, child)
+
+        if _deadline is not None:
+            from twisted.internet import reactor
+            delay = max(0, _deadline - reactor.seconds())
+            deadlineCall = reactor.callLater(delay, self._handleTimeout,
+                                             child)
 
         return defer.maybeDeferred(child.callRemote, command, **kwargs
             ).addCallback(_returned, child

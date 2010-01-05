@@ -697,6 +697,30 @@ class TestProcessPool(unittest.TestCase):
         """
         return self.processTimeoutTest(0)
 
+    def test_processDeadline(self):
+        pp = pool.ProcessPool(WaitingChild, min=1, max=1)
+
+        def _work(_):
+            d = pp.callRemote(First, data="ciao", _deadline=reactor.seconds())
+            self.assertFailure(d, error.ProcessTerminated)
+            return d
+
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(lambda _: pp.stop())
+
+    def test_processBeforeDeadline(self):
+        pp = pool.ProcessPool(PidChild, min=1, max=1)
+
+        def _work(_):
+            d = pp.callRemote(Pid, _deadline=reactor.seconds() + 10)
+            d.addCallback(lambda result: self.assertNotEqual(result['pid'], 0))
+            return d
+
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(lambda _: pp.stop())
+
     def test_processTimeoutSignal(self):
         """
         Test that a call that doesn't finish within the given timeout
