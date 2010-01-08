@@ -1,6 +1,10 @@
+
 from signal import SIGHUP
 import math
+import os
+import os.path
 from cStringIO import StringIO as sio
+import tempfile
 
 from twisted.internet import error, defer, reactor
 from twisted.python import failure, reflect
@@ -138,6 +142,29 @@ class Writer(child.AMPChild):
     Write.responder(write)
 
 
+class GetCWD(amp.Command):
+
+    response = [("cwd", amp.String())]
+
+
+class TempDirChild(child.AMPChild):
+
+    @staticmethod
+    def __enter__():
+        directory = tempfile.mkdtemp()
+        os.chdir(directory)
+
+    @staticmethod
+    def __exit__(exc_type, exc_val, exc_tb):
+        cwd = os.getcwd()
+        os.chdir('..')
+        os.rmdir(cwd)
+
+    def getcwd(self):
+        return {'cwd': os.getcwd()}
+    GetCWD.responder(getcwd)
+
+
 class TestAMPConnector(unittest.TestCase):
     def setUp(self):
         """
@@ -268,6 +295,19 @@ main()
            ).addCallback(lambda response:
                 self.assertEquals(response['response'], STRING)
            ).addCallback(lambda _: c.callRemote(commands.Shutdown))
+        return finished
+
+    def test_BootstrapContext(self):
+        starter = main.ProcessStarter(packages=('twisted', 'ampoule'))
+        c, finished = starter.startAMPProcess(TempDirChild)
+        cwd = []
+        def checkBootstrap(response):
+            cwd.append(response['cwd'])
+            self.assertNotEquals(cwd, os.getcwd())
+        c.callRemote(GetCWD
+            ).addCallback(checkBootstrap
+            ).addCallback(lambda _: c.callRemote(commands.Shutdown)
+            ).addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
         return finished
 
     def test_startAMPAndParentProtocol(self):
