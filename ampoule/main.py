@@ -122,7 +122,22 @@ def main(reactor, ampChildPath):
         stdio.StandardIO(ampChild(*sys.argv[1:-2]))
     else:
         stdio.StandardIO(ampChild(*sys.argv[1:-2]), %s, %s)
-    reactor.run()
+    enter = getattr(ampChild, '__enter__', None)
+    if enter is not None:
+        enter()
+    try:
+        reactor.run()
+    except:
+        if enter is not None:
+            info = sys.exc_info()
+            if not ampChild.__exit__(*info):
+                raise
+        else:
+            raise
+    else:
+        if enter is not None:
+            ampChild.__exit__(None, None, None)
+
 main(sys.argv[-2], sys.argv[-1])
 """ % (TO_CHILD, FROM_CHILD)
 
