@@ -17,7 +17,7 @@ try:
     import ampoule
     version = ampoule.__version__
 except ImportError:
-    version = "0.1.1"
+    version = "0.2.0"
 
 install_requires = ["Twisted>=8.0.1", "pyOpenSSL"]
 

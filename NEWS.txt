@@ -1,4 +1,4 @@
-Ampoule 0.1.1 (XXXX-XX-XX)
+Ampoule 0.2.0 (2010-02-02)
 ==========================
 
 Changes
@@ -12,6 +12,12 @@ Changes
   - Added pyOpenSSL as an explicit dependency since Twisted doesn't
     require it but AMP does.
   - Greatly simplify setup.py and support plain distutils too.
+  - Bootstrap code now supports context managers
+  - Support for execution deadline on child calls
+  - Parametrize the timeout signal to send to the child
+  - Pass arguments directly from the ProcessPool object for the child
+    process creation.
+    
 
 Ampoule 0.1 (2008-11-15)
 ==========================
