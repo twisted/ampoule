@@ -118,11 +118,12 @@ def main(reactor, ampChildPath):
     from twisted.python import reflect, runtime
 
     ampChild = reflect.namedAny(ampChildPath)
+    ampChildInstance = ampChild(*sys.argv[1:-2])
     if runtime.platform.isWindows():
-        stdio.StandardIO(ampChild(*sys.argv[1:-2]))
+        stdio.StandardIO(ampChildInstance)
     else:
-        stdio.StandardIO(ampChild(*sys.argv[1:-2]), %s, %s)
-    enter = getattr(ampChild, '__enter__', None)
+        stdio.StandardIO(ampChildInstance, %s, %s)
+    enter = getattr(ampChildInstance, '__enter__', None)
     if enter is not None:
         enter()
     try:
@@ -130,13 +131,13 @@ def main(reactor, ampChildPath):
     except:
         if enter is not None:
             info = sys.exc_info()
-            if not ampChild.__exit__(*info):
+            if not ampChildInstance.__exit__(*info):
                 raise
         else:
             raise
     else:
         if enter is not None:
-            ampChild.__exit__(None, None, None)
+            ampChildInstance.__exit__(None, None, None)
 
 main(sys.argv[-2], sys.argv[-1])
 """ % (TO_CHILD, FROM_CHILD)
