@@ -149,13 +149,18 @@ class GetCWD(amp.Command):
 
 class TempDirChild(child.AMPChild):
 
-    @staticmethod
-    def __enter__():
+    def __init__(self, directory=None):
+        child.AMPChild.__init__(self)
+        self.directory = directory
+
+    def __enter__(self):
         directory = tempfile.mkdtemp()
         os.chdir(directory)
+        if self.directory is not None:
+            os.mkdir(self.directory)
+            os.chdir(self.directory)
 
-    @staticmethod
-    def __exit__(exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         cwd = os.getcwd()
         os.chdir('..')
         os.rmdir(cwd)
@@ -304,6 +309,22 @@ main()
         def checkBootstrap(response):
             cwd.append(response['cwd'])
             self.assertNotEquals(cwd, os.getcwd())
+        def assertNotExists(path):
+            self.assertFalse()
+        c.callRemote(GetCWD
+            ).addCallback(checkBootstrap
+            ).addCallback(lambda _: c.callRemote(commands.Shutdown)
+            ).addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
+        return finished
+
+    def test_BootstrapContextInstance(self):
+        starter = main.ProcessStarter(packages=('twisted', 'ampoule'))
+        c, finished = starter.startAMPProcess(TempDirChild,
+                                              ampChildArgs=('foo',))
+        cwd = []
+        def checkBootstrap(response):
+            cwd.append(response['cwd'])
+            self.assertTrue(cwd[0].endswith('/foo'))
         c.callRemote(GetCWD
             ).addCallback(checkBootstrap
             ).addCallback(lambda _: c.callRemote(commands.Shutdown)
