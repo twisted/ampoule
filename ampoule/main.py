@@ -1,7 +1,6 @@
 import os
 import sys
 import imp
-import sets
 import itertools
 
 from zope.interface import implements
@@ -10,6 +9,7 @@ from twisted.internet import reactor, protocol, defer, error
 from twisted.python import log, util, reflect
 from twisted.protocols import amp
 from twisted.python import runtime
+from twisted.python.compat import set
 
 from ampoule import iampoule
 
@@ -277,7 +277,7 @@ def spawnProcess(processProtocol, bootstrap, args=(), env={},
         if p.startswith(os.path.join(sys.prefix, 'lib')):
             continue
         pythonpath.append(p)
-    pythonpath = list(sets.Set(pythonpath))
+    pythonpath = list(set(pythonpath))
     pythonpath.extend(env.get('PYTHONPATH', '').split(os.pathsep))
     env['PYTHONPATH'] = os.pathsep.join(pythonpath)
     args = (sys.executable, '-c', bootstrap) + args
