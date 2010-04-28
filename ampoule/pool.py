@@ -36,7 +36,8 @@ class ProcessPool(object):
     
     @ivar maxIdle: Maximum number of seconds of indleness in a child
     
-    @ivar starter: A process starter that implements L{iampoule.IStarter}.
+    @ivar starter: A process starter instance that provides
+                    L{iampoule.IStarter}.
     
     @ivar recycleAfter: Maximum number of calls before restarting a
                         subprocess, 0 to not recycle.
