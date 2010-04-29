@@ -309,8 +309,6 @@ main()
         def checkBootstrap(response):
             cwd.append(response['cwd'])
             self.assertNotEquals(cwd, os.getcwd())
-        def assertNotExists(path):
-            self.assertFalse()
         c.callRemote(GetCWD
             ).addCallback(checkBootstrap
             ).addCallback(lambda _: c.callRemote(commands.Shutdown)
