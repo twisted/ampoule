@@ -309,10 +309,10 @@ main()
         def checkBootstrap(response):
             cwd.append(response['cwd'])
             self.assertNotEquals(cwd, os.getcwd())
-        c.callRemote(GetCWD
-            ).addCallback(checkBootstrap
-            ).addCallback(lambda _: c.callRemote(commands.Shutdown)
-            ).addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
+        d = c.callRemote(GetCWD)
+        d.addCallback(checkBootstrap)
+        d.addCallback(lambda _: c.callRemote(commands.Shutdown))
+        finished.addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
         return finished
 
     def test_BootstrapContextInstance(self):
@@ -323,10 +323,10 @@ main()
         def checkBootstrap(response):
             cwd.append(response['cwd'])
             self.assertTrue(cwd[0].endswith('/foo'))
-        c.callRemote(GetCWD
-            ).addCallback(checkBootstrap
-            ).addCallback(lambda _: c.callRemote(commands.Shutdown)
-            ).addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
+        d = c.callRemote(GetCWD)
+        d.addCallback(checkBootstrap)
+        d.addCallback(lambda _: c.callRemote(commands.Shutdown))
+        finished.addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
         return finished
 
     def test_startAMPAndParentProtocol(self):
