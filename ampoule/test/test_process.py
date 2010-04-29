@@ -498,11 +498,16 @@ class TestProcessPool(unittest.TestCase):
         """
         Test that deferToAMPProcess works as expected.
         """
-        
+        def cleanupGlobalPool():
+            d = pool.pp.stop()
+            pool.pp = None
+            return d
+        self.addCleanup(cleanupGlobalPool)
+
         STRING = "CIAOOOO"
-        return pool.deferToAMPProcess(commands.Echo, data=STRING
-           ).addCallback(lambda result: self.assertEquals(result['response'], STRING)
-           ).addCallback(lambda _: pool.pp.stop())
+        d = pool.deferToAMPProcess(commands.Echo, data=STRING)
+        d.addCallback(self.assertEquals, {"response": STRING})
+        return d
 
     def test_checkStateInPool(self):
         """
