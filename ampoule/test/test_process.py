@@ -660,8 +660,15 @@ class TestProcessPool(unittest.TestCase):
             s = set()
             for succeed, response in results:
                 s.add(response['pid'])
-            self.assertEquals(len(s), MAX*math.ceil(float(CALLS)/(MAX*RECYCLE_AFTER)))
-        
+
+            # For the first C{MAX} calls, each is basically guaranteed to go to
+            # a different child.  After that, though, there are no guarantees.
+            # All the rest might go to a single child, since the child to
+            # perform a job is selected arbitrarily from the "ready" set.  Fair
+            # distribution of jobs needs to be implemented; right now it's "set
+            # ordering" distribution of jobs.
+            self.asserTrue(len(s) > MAX)
+
         def _work(_):
             l = [pp.doWork(Pid) for x in xrange(CALLS)]
             d = defer.DeferredList(l)
