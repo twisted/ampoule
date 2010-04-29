@@ -623,6 +623,7 @@ class TestProcessPool(unittest.TestCase):
         MIN = 1
         RECYCLE_AFTER = 1
         pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        self.addCleanup(pp.stop)
         
         def _checks(_):
             self.assertEquals(pp.started, True)
@@ -637,13 +638,11 @@ class TestProcessPool(unittest.TestCase):
                 ).addCallback(lambda response: response['pid']
                 ).addCallback(self.assertNotEquals, pid)
         
-        def finish(reason):
-            return pp.stop().addCallback(lambda _: reason)
 
-        return pp.start(
-            ).addCallback(_checks
-            ).addCallback(_checks2
-            ).addCallback(finish)
+        d = pp.start()
+        d.addCallback(_checks)
+        d.addCallback(_checks2)
+        return d
     
     def test_recyclingWithQueueOverload(self):
         """
@@ -655,6 +654,7 @@ class TestProcessPool(unittest.TestCase):
         RECYCLE_AFTER = 10
         CALLS = 60
         pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        self.addCleanup(pp.stop)
         
         def _check(results):
             s = set()
@@ -666,9 +666,10 @@ class TestProcessPool(unittest.TestCase):
             l = [pp.doWork(Pid) for x in xrange(CALLS)]
             d = defer.DeferredList(l)
             return d.addCallback(_check)
-        return pp.start(
-            ).addCallback(_work
-            ).addCallback(lambda _: pp.stop())
+        d = pp.start()
+        d.addCallback(_work)
+        return d
+
 
     def test_disableProcessRecycling(self):
         """
