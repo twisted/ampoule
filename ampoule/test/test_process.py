@@ -667,7 +667,7 @@ class TestProcessPool(unittest.TestCase):
             # perform a job is selected arbitrarily from the "ready" set.  Fair
             # distribution of jobs needs to be implemented; right now it's "set
             # ordering" distribution of jobs.
-            self.asserTrue(len(s) > MAX)
+            self.assertTrue(len(s) > MAX)
 
         def _work(_):
             l = [pp.doWork(Pid) for x in xrange(CALLS)]
