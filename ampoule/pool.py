@@ -302,7 +302,6 @@ class ProcessPool(object):
                 # [call(Command) for x in xrange(BIG_NUMBER)]
                 self.startAWorker()
                 return self._cb_doWork(command, **kwargs)
-                return d
             else:
                 # No one is free... just queue up and wait for a process
                 # to start and pick up the first item in the queue.
