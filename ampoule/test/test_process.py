@@ -710,14 +710,22 @@ class TestProcessPool(unittest.TestCase):
         SECOND = "poll"
         
         def checkDefault():
-            pp = pool.ProcessPool(starter=main.ProcessStarter(childReactor=FIRST), ampChild=ReactorChild, min=MIN, max=MAX)
+            pp = pool.ProcessPool(
+                starter=main.ProcessStarter(
+                    childReactor=FIRST,
+                    packages=("twisted", "ampoule")),
+                ampChild=ReactorChild, min=MIN, max=MAX)
             pp.start()
             return pp.doWork(Reactor
                 ).addCallback(self.assertEquals, {'classname': "SelectReactor"}
                 ).addCallback(lambda _: pp.stop())
             
         def checkPool(_):
-            pp = pool.ProcessPool(starter=main.ProcessStarter(childReactor=SECOND), ampChild=ReactorChild, min=MIN, max=MAX)
+            pp = pool.ProcessPool(
+                starter=main.ProcessStarter(
+                    childReactor=SECOND,
+                    packages=("twisted", "ampoule")),
+                ampChild=ReactorChild, min=MIN, max=MAX)
             pp.start()
             return pp.doWork(Reactor
                 ).addCallback(self.assertEquals, {'classname': "PollReactor"}
