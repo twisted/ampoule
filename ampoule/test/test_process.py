@@ -309,12 +309,10 @@ main()
         def checkBootstrap(response):
             cwd.append(response['cwd'])
             self.assertNotEquals(cwd, os.getcwd())
-        def assertNotExists(path):
-            self.assertFalse()
-        c.callRemote(GetCWD
-            ).addCallback(checkBootstrap
-            ).addCallback(lambda _: c.callRemote(commands.Shutdown)
-            ).addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
+        d = c.callRemote(GetCWD)
+        d.addCallback(checkBootstrap)
+        d.addCallback(lambda _: c.callRemote(commands.Shutdown))
+        finished.addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
         return finished
 
     def test_BootstrapContextInstance(self):
@@ -325,10 +323,10 @@ main()
         def checkBootstrap(response):
             cwd.append(response['cwd'])
             self.assertTrue(cwd[0].endswith('/foo'))
-        c.callRemote(GetCWD
-            ).addCallback(checkBootstrap
-            ).addCallback(lambda _: c.callRemote(commands.Shutdown)
-            ).addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
+        d = c.callRemote(GetCWD)
+        d.addCallback(checkBootstrap)
+        d.addCallback(lambda _: c.callRemote(commands.Shutdown))
+        finished.addCallback(lambda _: self.assertFalse(os.path.exists(cwd[0])))
         return finished
 
     def test_startAMPAndParentProtocol(self):
@@ -500,11 +498,16 @@ class TestProcessPool(unittest.TestCase):
         """
         Test that deferToAMPProcess works as expected.
         """
-        
+        def cleanupGlobalPool():
+            d = pool.pp.stop()
+            pool.pp = None
+            return d
+        self.addCleanup(cleanupGlobalPool)
+
         STRING = "CIAOOOO"
-        return pool.deferToAMPProcess(commands.Echo, data=STRING
-           ).addCallback(lambda result: self.assertEquals(result['response'], STRING)
-           ).addCallback(lambda _: pool.pp.stop())
+        d = pool.deferToAMPProcess(commands.Echo, data=STRING)
+        d.addCallback(self.assertEquals, {"response": STRING})
+        return d
 
     def test_checkStateInPool(self):
         """
@@ -620,6 +623,7 @@ class TestProcessPool(unittest.TestCase):
         MIN = 1
         RECYCLE_AFTER = 1
         pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        self.addCleanup(pp.stop)
         
         def _checks(_):
             self.assertEquals(pp.started, True)
@@ -634,13 +638,11 @@ class TestProcessPool(unittest.TestCase):
                 ).addCallback(lambda response: response['pid']
                 ).addCallback(self.assertNotEquals, pid)
         
-        def finish(reason):
-            return pp.stop().addCallback(lambda _: reason)
 
-        return pp.start(
-            ).addCallback(_checks
-            ).addCallback(_checks2
-            ).addCallback(finish)
+        d = pp.start()
+        d.addCallback(_checks)
+        d.addCallback(_checks2)
+        return d
     
     def test_recyclingWithQueueOverload(self):
         """
@@ -652,20 +654,29 @@ class TestProcessPool(unittest.TestCase):
         RECYCLE_AFTER = 10
         CALLS = 60
         pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        self.addCleanup(pp.stop)
         
         def _check(results):
             s = set()
             for succeed, response in results:
                 s.add(response['pid'])
-            self.assertEquals(len(s), MAX*math.ceil(float(CALLS)/(MAX*RECYCLE_AFTER)))
-        
+
+            # For the first C{MAX} calls, each is basically guaranteed to go to
+            # a different child.  After that, though, there are no guarantees.
+            # All the rest might go to a single child, since the child to
+            # perform a job is selected arbitrarily from the "ready" set.  Fair
+            # distribution of jobs needs to be implemented; right now it's "set
+            # ordering" distribution of jobs.
+            self.assertTrue(len(s) > MAX)
+
         def _work(_):
             l = [pp.doWork(Pid) for x in xrange(CALLS)]
             d = defer.DeferredList(l)
             return d.addCallback(_check)
-        return pp.start(
-            ).addCallback(_work
-            ).addCallback(lambda _: pp.stop())
+        d = pp.start()
+        d.addCallback(_work)
+        return d
+
 
     def test_disableProcessRecycling(self):
         """

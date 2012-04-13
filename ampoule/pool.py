@@ -157,8 +157,8 @@ class ProcessPool(object):
         """
         if self._queue:
             _, (d, command, kwargs) = pop(self._queue)
-            self._cb_doWork(command, _d=d, **kwargs)
-    
+            self._cb_doWork(command, **kwargs).chainDeferred(d)
+
     def _handleTimeout(self, child):
         """
         One of the children went timeout, we need to deal with it
@@ -197,7 +197,7 @@ class ProcessPool(object):
                                           ampChildArgs=self.ampChildArgs)
         return self._addProcess(child, finished)
     
-    def _cb_doWork(self, command, _d=None, _timeout=None, _deadline=None,
+    def _cb_doWork(self, command, _timeout=None, _deadline=None,
                    **kwargs):
         """
         Go and call the command.
@@ -239,12 +239,7 @@ class ProcessPool(object):
             # the process might have received tons of calls already
             # which would make it run more calls than what is
             # configured to do.
-            if is_error:
-                _d.errback(result)
-                return _d
-            else:
-                _d.callback(result)
-                return _d
+            return result
         
         die = False
         child = self.ready.pop()
@@ -295,10 +290,8 @@ class ProcessPool(object):
         
         @param kwargs: dictionary containing the arguments for the command.
         """
-        d = defer.Deferred()
         if self.ready: # there are unused processes, let's use them
-            self._cb_doWork(command, _d=d, **kwargs)
-            return d
+            return self._cb_doWork(command, **kwargs)
         else:
             if len(self.processes) < self.max:
                 # no unused but we can start some new ones
@@ -309,11 +302,11 @@ class ProcessPool(object):
                 # Process pool with min=1, max=1, recycle_after=1
                 # [call(Command) for x in xrange(BIG_NUMBER)]
                 self.startAWorker()
-                self._cb_doWork(command, _d=d, **kwargs)
-                return d
+                return self._cb_doWork(command, **kwargs)
             else:
                 # No one is free... just queue up and wait for a process
                 # to start and pick up the first item in the queue.
+                d = defer.Deferred()
                 self._queue.append((count(), (d, command, kwargs)))
                 return d
     

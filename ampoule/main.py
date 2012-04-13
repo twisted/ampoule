@@ -189,7 +189,7 @@ class ProcessStarter(object):
         self.uid = uid
         self.gid = gid
         self.usePTY = usePTY
-        self.packages = packages
+        self.packages = ("ampoule",) + packages
         self.childReactor = childReactor
 
     def __repr__(self):
