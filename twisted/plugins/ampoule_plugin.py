@@ -2,23 +2,23 @@
 Ampoule plugins for Twisted.
 """
 import sys
-from zope.interface import classProvides
+from zope.interface import provider
 from twisted.plugin import IPlugin
 from twisted.python.usage import Options
 from twisted.python import reflect
-from twisted.application.service import IServiceMaker, IService
+from twisted.application.service import IServiceMaker
 
+@provider(IPlugin, IServiceMaker)
 class AMPoulePlugin(object):
     """
     This plugin provides ways to create a process pool service in your
     system listening on a given port and interface and answering to a
     given set of commands.
     """
-    classProvides(IPlugin, IServiceMaker)
-    
+
     tapname = "ampoule"
     description = "Run an AMPoule process pool"
-    
+
     class options(Options):
         from twisted.application import reactors
         optParameters = [
