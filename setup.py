@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- test-case-name: ampoule -*-
 
 # Copyright (c) 2008 Valentino Volonghi.
 # See LICENSE for details.
