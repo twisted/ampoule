@@ -3,7 +3,7 @@ from twisted.internet.protocol import ClientFactory
 from twisted.trial import unittest
 from twisted.protocols import amp
 
-from ampoule import service, child, pool, main
+from ampoule import service, child, pool
 from ampoule.commands import Echo
 
 class ClientAMP(amp.AMP):

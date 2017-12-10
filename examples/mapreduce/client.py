@@ -5,17 +5,13 @@
 # twistd -no ampoule --child=mapreduce.MapReducer
 
 from twisted.internet.protocol import ClientFactory
-from twisted.python import filepath as fp, reflect
+from twisted.python import filepath as fp
 from twisted.internet import reactor, defer
 from twisted.protocols import amp
 
 from mapreduce import Map, Reduce
 from ampoule.util import mainpoint
 
-import os
-import sys
-import glob
-import shutil
 import collections
 
 def mymap(in_, out):
@@ -58,7 +54,6 @@ def map_step(pool, directory, resultdir):
     the mapper function, then whatever I return is passed to the
     successive steps as first argument.
     """
-    main_list = []
     outputdir = resultdir.child(directory.basename())
     outputdir.createDirectory()
 

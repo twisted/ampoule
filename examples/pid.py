@@ -24,7 +24,7 @@ def main(args):
         pp = pool.ProcessPool(MyChild, min=1, max=1)
         yield pp.start()
         result = yield pp.doWork(Pid)
-        print "The Child process PID is:", result['pid']
+        print("The Child process PID is:", result['pid'])
         yield pp.stop()
         reactor.stop()
     

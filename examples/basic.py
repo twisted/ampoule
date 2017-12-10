@@ -19,9 +19,9 @@ def main(args):
         yield pp.start()
         t = time.time()
         REPEATS = 40000
-        l = [pp.doWork(Ping) for x in xrange(REPEATS)]
+        l = [pp.doWork(Ping) for x in range(REPEATS)]
         yield defer.DeferredList(l)
-        print REPEATS/(time.time() - t)
+        print(REPEATS/(time.time() - t))
         yield pp.stop()
         reactor.stop()
 

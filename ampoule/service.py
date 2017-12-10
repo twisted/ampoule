@@ -1,5 +1,3 @@
-import os
-
 from twisted.application import service
 from twisted.internet.protocol import ServerFactory
 

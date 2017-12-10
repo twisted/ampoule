@@ -10,7 +10,7 @@ count = functools.partial(next, itertools.count())
 pop = heapq.heappop
 
 from twisted.internet import defer, task, error
-from twisted.python import log, failure
+from twisted.python import log
 
 from ampoule import commands, main
 
