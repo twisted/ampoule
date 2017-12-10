@@ -19,10 +19,10 @@ try:
 except ImportError:
     version = "0.2.1"
 
-install_requires = ["Twisted>=8.0.1", "pyOpenSSL"]
+install_requires = ["Twisted>=17[tls]"]
 
 description = """A process pool implementation in Twisted Matrix and AMP"""
-long_description = file('README').read()
+long_description = open('README').read()
 
 setup(
     name = "ampoule",
