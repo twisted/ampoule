@@ -8,17 +8,13 @@
 Distutils/Setuptools installer for AMPoule.
 """
 
-try:
-    # Load setuptools, to build a specific source package
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup
 
 try:
     import ampoule
     version = ampoule.__version__
 except ImportError:
-    version = "0.2.1"
+    version = "0.3.0"
 
 install_requires = ["Twisted>=17[tls]"]
 
@@ -26,9 +22,11 @@ description = """A process pool implementation in Twisted Matrix and AMP"""
 long_description = open('README').read()
 
 setup(
-    name = "ampoule",
+    name = "ampoul3",
     author = "Valentino Volonghi",
     author_email = "dialtone@gmail.com",
+    maintainer = "Glyph Lefkowitz",
+    maintainer_email = "glyph@twistedmatrix.com",
     description = description,
     long_description = long_description,
     license = "MIT License",

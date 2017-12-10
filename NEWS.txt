@@ -1,3 +1,16 @@
+Ampoul3 0.3.0 (2017-12-10)
+==========================
+
+Changes
+-------
+
+  - Python 3 support.
+  - Pyflakes fixes.
+  - No more trailing whitespace :).
+  - Migrated to Git.
+  - (Hopefully temporary) package name change while I wait for Valentino to
+    give me access to PyPI...
+
 Ampoule 0.2.0 (2010-02-02)
 ==========================
 
