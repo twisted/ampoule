@@ -14,7 +14,7 @@ class AMPProxy(amp.AMP):
                         L{amp.Command} as first argument and other
                         optional keyword arguments afterwards.
         @type wrapped: L{callable}.
-        
+
         @param child: The protocol class of the process pool children.
                       Used to forward only the methods that are actually
                       understood correctly by them.
@@ -23,17 +23,17 @@ class AMPProxy(amp.AMP):
         amp.AMP.__init__(self)
         self.wrapped = wrapped
         self.child = child
-        
+
         localCd = set(self._commandDispatch.keys())
         childCd = set(self.child._commandDispatch.keys())
         assert localCd.intersection(childCd) == set([b"StartTLS"]), \
                     "Illegal method overriding in Proxy"
-    
+
     def locateResponder(self, name):
         """
         This is a custom locator to forward calls to the children
         processes while keeping the ProcessPool a transparent MITM.
-        
+
         This way of working has a few limitations, the first of which
         is the fact that children won't be able to take advantage of
         any dynamic locator except for the default L{CommandLocator}
@@ -43,7 +43,7 @@ class AMPProxy(amp.AMP):
         if name == "StartTLS":
             # This is a special case where the proxy takes precedence
             return amp.AMP.locateResponder(self, "StartTLS")
-    
+
         # Get the dict of commands from the child AMP implementation.
         cd = self.child._commandDispatch
         if name in cd:
@@ -61,4 +61,4 @@ class AMPProxy(amp.AMP):
         # means that it might be in this class, so fallback to the
         # default behavior of this module.
         return amp.AMP.locateResponder(self, name)
-        
+

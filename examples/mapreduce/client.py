@@ -86,7 +86,7 @@ class AMPFactory(ClientFactory):
     """
     I store variables useful for the protocol connected to the pool.
     """
-    
+
     def __init__(self, dirs, resultdir, steps):
         self.dirs = dirs
         self.resultdir = resultdir

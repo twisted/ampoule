@@ -24,31 +24,31 @@ class ProcessPool(object):
     """
     This class generalizes the functionality of a pool of
     processes to which work can be dispatched.
-    
+
     @ivar finished: Boolean flag, L{True} when the pool is finished.
-    
+
     @ivar started: Boolean flag, L{True} when the pool is started.
-    
+
     @ivar name: Optional name for the process pool
-    
+
     @ivar min: Minimum number of subprocesses to set up
-    
+
     @ivar max: Maximum number of subprocesses to set up
-    
+
     @ivar maxIdle: Maximum number of seconds of indleness in a child
-    
+
     @ivar starter: A process starter instance that provides
                     L{iampoule.IStarter}.
-    
+
     @ivar recycleAfter: Maximum number of calls before restarting a
                         subprocess, 0 to not recycle.
-    
+
     @ivar ampChild: The child AMP protocol subclass with the commands
                     that the child should implement.
-    
+
     @ivar ampParent: The parent AMP protocol subclass with the commands
                     that the parent should implement.
-    
+
     @ivar timeout: The general timeout (in seconds) for every child
                     process call.
     """
@@ -77,7 +77,7 @@ class ProcessPool(object):
         self.timeout = timeout
         self.timeout_signal = timeout_signal
         self._queue = []
-        
+
         self.processes = set()
         self.ready = set()
         self.busy = set()
@@ -86,11 +86,11 @@ class ProcessPool(object):
         self._calls = {}
         self.looping = task.LoopingCall(self._pruneProcesses)
         self.looping.start(maxIdle, now=False)
-    
+
     def start(self, ampChild=None):
         """
         Starts the ProcessPool with a given child protocol.
-        
+
         @param ampChild: a L{ampoule.child.AMPChild} subclass.
         @type ampChild: L{ampoule.child.AMPChild} subclass
         """
@@ -99,7 +99,7 @@ class ProcessPool(object):
         self.finished = False
         self.started = True
         return self.adjustPoolSize()
-    
+
     def _pruneProcesses(self):
         """
         Remove idle processes from the pool.
@@ -110,7 +110,7 @@ class ProcessPool(object):
             if len(self.processes) > self.min and (n - lastUse) > self.maxIdle:
                 # we are setting lastUse when processing finishes, it
                 # might be processing right now
-                if child not in self.busy: 
+                if child not in self.busy:
                     # we need to remove this child from the ready set
                     # and the processes set because otherwise it might
                     # get calls from doWork
@@ -118,7 +118,7 @@ class ProcessPool(object):
                     self.processes.discard(child)
                     d.append(self.stopAWorker(child))
         return defer.DeferredList(d)
-    
+
     def _pruneProcess(self, child):
         """
         Remove every trace of the process from this instance.
@@ -129,7 +129,7 @@ class ProcessPool(object):
         self._lastUsage.pop(child, None)
         self._calls.pop(child, None)
         self._finishCallbacks.pop(child, None)
-    
+
     def _addProcess(self, child, finished):
         """
         Adds the newly created child process to the pool.
@@ -142,7 +142,7 @@ class ProcessPool(object):
         def dieGently(data, child):
             log.msg("STOPPING: '%s'" % (data,))
             self._pruneProcess(child)
-        
+
         self.processes.add(child)
         self.ready.add(child)
         finished.addCallback(dieGently, child
@@ -151,7 +151,7 @@ class ProcessPool(object):
         self._lastUsage[child] = now()
         self._calls[child] = 0
         self._catchUp()
-    
+
     def _catchUp(self):
         """
         If there are queued items in the list then run them.
@@ -163,7 +163,7 @@ class ProcessPool(object):
     def _handleTimeout(self, child):
         """
         One of the children went timeout, we need to deal with it
-        
+
         @param child: The child process
         @type child: L{child.AMPChild}
         """
@@ -173,7 +173,7 @@ class ProcessPool(object):
             # don't do anything then... we are too late
             # or we were too early to call
             pass
-    
+
     def startAWorker(self):
         """
         Start a worker and set it up in the system.
@@ -197,18 +197,18 @@ class ProcessPool(object):
                                           ampParent=self.ampParent,
                                           ampChildArgs=self.ampChildArgs)
         return self._addProcess(child, finished)
-    
+
     def _cb_doWork(self, command, _timeout=None, _deadline=None,
                    **kwargs):
         """
         Go and call the command.
-        
+
         @param command: The L{amp.Command} to be executed in the child
         @type command: L{amp.Command}
-        
+
         @param _d: The deferred for the calling code.
         @type _d: L{defer.Deferred}
-        
+
         @param _timeout: The timeout for this call only
         @type _timeout: C{int}
         @param _deadline: The deadline for this call only
@@ -216,7 +216,7 @@ class ProcessPool(object):
         """
         timeoutCall = None
         deadlineCall = None
-        
+
         def _returned(result, child, is_error=False):
             def cancelCall(call):
                 if call is not None and call.active():
@@ -241,12 +241,12 @@ class ProcessPool(object):
             # which would make it run more calls than what is
             # configured to do.
             return result
-        
+
         die = False
         child = self.ready.pop()
         self.busy.add(child)
         self._calls[child] += 1
-        
+
         # Let's see if this call goes over the recycling barrier
         if self.recycleAfter and self._calls[child] >= self.recycleAfter:
             # it does so mark this child, using a closure, to be
@@ -275,20 +275,20 @@ class ProcessPool(object):
         return defer.maybeDeferred(child.callRemote, command, **kwargs
             ).addCallback(_returned, child
             ).addErrback(_returned, child, is_error=True)
-    
+
     def callRemote(self, *args, **kwargs):
         """
         Proxy call to keep the API homogeneous across twisted's RPCs
         """
         return self.doWork(*args, **kwargs)
-    
+
     def doWork(self, command, **kwargs):
         """
         Sends the command to one child.
-        
+
         @param command: an L{amp.Command} type object.
         @type command: L{amp.Command}
-        
+
         @param kwargs: dictionary containing the arguments for the command.
         """
         if self.ready: # there are unused processes, let's use them
@@ -310,14 +310,14 @@ class ProcessPool(object):
                 d = defer.Deferred()
                 self._queue.append((count(), (d, command, kwargs)))
                 return d
-    
+
     def stopAWorker(self, child=None):
         """
         Gently stop a child so that it's not restarted anymore
-        
+
         @param command: an L{ampoule.child.AmpChild} type object.
         @type command: L{ampoule.child.AmpChild} or None
-        
+
         """
         if child is None:
             if self.ready:
@@ -337,7 +337,7 @@ class ProcessPool(object):
             # Does this even make sense to you?
             ).addErrback(lambda reason: reason.trap(error.ProcessTerminated))
         return self._finishCallbacks[child]
-    
+
     def _startSomeWorkers(self):
         """
         Start a bunch of workers until we reach the max number of them.
@@ -358,18 +358,18 @@ class ProcessPool(object):
 
         assert min >= 0, 'minimum is negative'
         assert min <= max, 'minimum is greater than maximum'
-        
+
         self.min = min
         self.max = max
-        
+
         l = []
         if self.started:
-            
+
             for i in range(len(self.processes)-self.max):
                 l.append(self.stopAWorker())
             while len(self.processes) < self.min:
                 self.startAWorker()
-        
+
         return defer.DeferredList(l).addCallback(lambda _: self.dumpStats())
 
     def stop(self):
@@ -402,10 +402,10 @@ def deferToAMPProcess(command, **kwargs):
     Helper function that sends a command to the default process pool
     and returns a deferred that fires when the result of the
     subprocess computation is ready.
-    
+
     @param command: an L{amp.Command} subclass
     @param kwargs: dictionary containing the arguments for the command.
-    
+
     @return: a L{defer.Deferred} with the data from the subprocess.
     """
     global pp

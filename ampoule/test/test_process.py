@@ -33,17 +33,17 @@ class FakeAMP(object):
     reason = None
     def __init__(self, s):
         self.s = s
-        
+
     def makeConnection(self, connector):
         if self.connector is not None:
             raise Exception("makeConnection called twice")
         self.connector = connector
-    
+
     def connectionLost(self, reason):
         if self.reason is not None:
             raise Exception("connectionLost called twice")
         self.reason = reason
-    
+
     def dataReceived(self, data):
         self.s.write(data)
 
@@ -85,7 +85,7 @@ class NoResponseChild(child.AMPChild):
         self._set = arg
         return {}
     NoResponse.responder(noresponse)
-    
+
     def getresponse(self):
         return {"response": self._set}
     GetResponse.responder(getresponse)
@@ -189,7 +189,7 @@ class TestAMPConnector(unittest.TestCase):
         assert ac.name is not None
         ac.transport = _FakeT(s)
         return ac
-        
+
     def test_protocol(self):
         """
         Test that outReceived writes to AMP and that it triggers the
@@ -198,17 +198,17 @@ class TestAMPConnector(unittest.TestCase):
         s = sio()
         sa = sio()
         ac = self._makeConnector(s, sa)
-        
+
         for x in range(99):
             ac.childDataReceived(4, str(x).encode("ascii"))
-        
+
         ac.processEnded(failure.Failure(error.ProcessDone(0)))
         return ac.finished.addCallback(
             lambda _: self.assertEqual(sa.getvalue(), b''.join(
                 str(x).encode("ascii") for x in range(99)
             ))
         )
-        
+
     def test_protocol_failing(self):
         """
         Test that a failure in the process termination is correctly
@@ -217,7 +217,7 @@ class TestAMPConnector(unittest.TestCase):
         s = sio()
         sa = sio()
         ac = self._makeConnector(s, sa)
-        
+
         ac.finished.addCallback(_raise)
         fail = failure.Failure(error.ProcessTerminated())
         self.assertFailure(ac.finished, error.ProcessTerminated)
@@ -243,7 +243,7 @@ main(sys.argv[1])
 
         amp, finished = starter.startPythonProcess(main.AMPConnector(a))
         return finished.addCallback(lambda _: self.assertEquals(s.getvalue(), STRING))
-    
+
     def test_failing_deferToProcess(self):
         """
         Test failing subprocesses and the way they terminate and preserve
@@ -260,7 +260,7 @@ main(sys.argv[1])
 """
         starter = main.ProcessStarter(bootstrap=BOOT, args=(STRING,), packages=("twisted", "ampoule"))
         ready, finished = starter.startPythonProcess(main.AMPConnector(a), "I'll be ignored")
-        
+
         self.assertFailure(finished, error.ProcessTerminated)
         finished.addErrback(lambda reason: self.assertEquals(reason.getMessage(), STRING))
         return finished
@@ -292,7 +292,7 @@ main()
         accepts commands and correctly answers them.
         """
         STRING = b"ciao"
-        
+
         starter = main.ProcessStarter(packages=("twisted", "ampoule"))
         c, finished = starter.startAMPProcess(child.AMPChild)
         c.callRemote(commands.Echo, data=STRING
@@ -340,7 +340,7 @@ main()
             def pong(self, data):
                 return {'response': DATA+APPEND}
             Pong.responder(pong)
-        
+
         starter = main.ProcessStarter(packages=("twisted", "ampoule"))
 
         subp, finished = starter.startAMPProcess(ampChild=Child, ampParent=Parent)
@@ -357,13 +357,13 @@ main()
         """
         class Child(child.AMPChild):
             pass
-        
+
         starter = main.ProcessStarter(packages=("twisted", "ampoule"))
 
         self.assertRaises(RuntimeError, starter.startAMPProcess, ampChild=Child)
 
 class TestProcessPool(unittest.TestCase):
-        
+
     def test_startStopWorker(self):
         """
         Test that starting and stopping a worker keeps the state of
@@ -381,7 +381,7 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(len(pp.processes), 1)
             self.assertEquals(len(pp._finishCallbacks), 1)
             return pp.stopAWorker()
-        
+
         def _closingUp(_):
             self.assertEquals(pp.started, False)
             self.assertEquals(pp.finished, False)
@@ -401,14 +401,14 @@ class TestProcessPool(unittest.TestCase):
         self.assertEquals(pp.finished, False)
         self.assertEquals(pp.processes, set())
         self.assertEquals(pp._finishCallbacks, {})
-        
+
         def _checks(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             return pp.stop()
-        
+
         def _closingUp(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, True)
@@ -425,14 +425,14 @@ class TestProcessPool(unittest.TestCase):
         self.assertEquals(pp.finished, False)
         self.assertEquals(pp.processes, set())
         self.assertEquals(pp._finishCallbacks, {})
-        
+
         def _resize1(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             return pp.adjustPoolSize(min=2, max=3)
-        
+
         def _resize2(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
@@ -440,12 +440,12 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(pp.min, 2)
             self.assertEquals(len(pp.processes), pp.max)
             self.assertEquals(len(pp._finishCallbacks), pp.max)
-        
+
         def _resize3(_):
             self.assertRaises(AssertionError, pp.adjustPoolSize, min=-1, max=5)
             self.assertRaises(AssertionError, pp.adjustPoolSize, min=5, max=1)
             return pp.stop()
-        
+
         return pp.start(
             ).addCallback(_resize1
             ).addCallback(_resize2
@@ -457,16 +457,16 @@ class TestProcessPool(unittest.TestCase):
         """
         pp = pool.ProcessPool(ampChild=BadChild, min=1)
         STRING = b"DATA"
-        
+
         def _checks(_):
             d = next(iter(pp._finishCallbacks.values()))
             pp.doWork(Die).addErrback(lambda _: None)
             return d.addBoth(_checksAgain)
-        
+
         def _checksAgain(_):
             return pp.doWork(commands.Echo, data=STRING
                     ).addCallback(lambda result: self.assertEquals(result['response'], STRING))
-        
+
         return pp.start(
             ).addCallback(_checks
             ).addCallback(lambda _: pp.stop())
@@ -482,7 +482,7 @@ class TestProcessPool(unittest.TestCase):
             def pong(self, data):
                 return {'response': DATA+APPEND}
             Pong.responder(pong)
-        
+
         pp = pool.ProcessPool(ampChild=Child, ampParent=Parent)
         def _checks(_):
             return pp.doWork(Ping, data=DATA
@@ -513,7 +513,7 @@ class TestProcessPool(unittest.TestCase):
         Test that busy and ready lists are correctly maintained.
         """
         pp = pool.ProcessPool(ampChild=WaitingChild)
-        
+
         DATA = b"foobar"
 
         def _checks(_):
@@ -545,7 +545,7 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
-            
+
             D = b"DATA"
             d = [pp.doWork(First, data=D) for x in range(MAX)]
 
@@ -553,31 +553,31 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), pp.max)
             self.assertEquals(len(pp._finishCallbacks), pp.max)
-            
+
             [child.callRemote(Second) for child in pp.processes]
             return defer.DeferredList(d)
 
         return pp.start(
             ).addCallback(_checks
             ).addCallback(lambda _: pp.stop())
-    
+
     def test_growingToMaxAndShrinking(self):
         """
         Test that the pool grows but after 'idle' time the number of
         processes goes back to the minimum.
         """
-        
+
         MAX = 5
         MIN = 1
         IDLE = 1
         pp = pool.ProcessPool(ampChild=WaitingChild, min=MIN, max=MAX, maxIdle=IDLE)
-                
+
         def _checks(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
-            
+
             D = b"DATA"
             d = [pp.doWork(First, data=D) for x in range(MAX)]
 
@@ -585,10 +585,10 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(pp.finished, False)
             self.assertEquals(len(pp.processes), pp.max)
             self.assertEquals(len(pp._finishCallbacks), pp.max)
-            
+
             [child.callRemote(Second) for child in pp.processes]
             return defer.DeferredList(d).addCallback(_realChecks)
-            
+
         def _realChecks(_):
             from twisted.internet import reactor
             d = defer.Deferred()
@@ -608,7 +608,7 @@ class TestProcessPool(unittest.TestCase):
                               # this right here
             reactor.callLater(IDLE, _cb)
             return d
-        
+
         return pp.start(
             ).addCallback(_checks
             ).addCallback(lambda _: pp.stop())
@@ -623,7 +623,7 @@ class TestProcessPool(unittest.TestCase):
         RECYCLE_AFTER = 1
         pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
         self.addCleanup(pp.stop)
-        
+
         def _checks(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
@@ -631,18 +631,18 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             return pp.doWork(Pid
                 ).addCallback(lambda response: response['pid'])
-        
+
         def _checks2(pid):
             return pp.doWork(Pid
                 ).addCallback(lambda response: response['pid']
                 ).addCallback(self.assertNotEquals, pid)
-        
+
 
         d = pp.start()
         d.addCallback(_checks)
         d.addCallback(_checks2)
         return d
-    
+
     def test_recyclingWithQueueOverload(self):
         """
         Test that we get the correct number of different results when
@@ -654,7 +654,7 @@ class TestProcessPool(unittest.TestCase):
         CALLS = 60
         pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
         self.addCleanup(pp.stop)
-        
+
         def _check(results):
             s = set()
             for succeed, response in results:
@@ -685,7 +685,7 @@ class TestProcessPool(unittest.TestCase):
         MIN = 1
         RECYCLE_AFTER = 0
         pp = pool.ProcessPool(ampChild=PidChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
-        
+
         def _checks(_):
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
@@ -693,13 +693,13 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             return pp.doWork(Pid
                 ).addCallback(lambda response: response['pid'])
-        
+
         def _checks2(pid):
             return pp.doWork(Pid
                 ).addCallback(lambda response: response['pid']
                 ).addCallback(self.assertEquals, pid
                 ).addCallback(lambda _: pid)
-        
+
         def finish(reason):
             return pp.stop().addCallback(lambda _: reason)
 
@@ -707,8 +707,8 @@ class TestProcessPool(unittest.TestCase):
             ).addCallback(_checks
             ).addCallback(_checks2
             ).addCallback(_checks2
-            ).addCallback(finish)        
-    
+            ).addCallback(finish)
+
     def test_changeChildrenReactor(self):
         """
         Test that by passing the correct argument children change their
@@ -718,7 +718,7 @@ class TestProcessPool(unittest.TestCase):
         MIN = 1
         FIRST = "select"
         SECOND = "poll"
-        
+
         def checkDefault():
             pp = pool.ProcessPool(
                 starter=main.ProcessStarter(
@@ -741,7 +741,7 @@ class TestProcessPool(unittest.TestCase):
                     .addCallback(self.assertEquals,
                                  {'classname': b"PollReactor"})
                     .addCallback(lambda _: pp.stop()))
-            
+
         return checkDefault(
             ).addCallback(checkPool)
     try:
@@ -760,7 +760,7 @@ class TestProcessPool(unittest.TestCase):
         def _check(_):
             return pp.doWork(GetResponse
                 ).addCallback(self.assertEquals, {"response": DATA})
-        
+
         def _work(_):
             return pp.doWork(NoResponse, arg=DATA)
 
@@ -782,7 +782,7 @@ class TestProcessPool(unittest.TestCase):
 
     def processTimeoutTest(self, timeout):
         pp = pool.ProcessPool(WaitingChild, min=1, max=1)
-        
+
         def _work(_):
             d = pp.callRemote(First, data=b"ciao", _timeout=timeout)
             self.assertFailure(d, error.ProcessTerminated)
@@ -836,7 +836,7 @@ class TestProcessPool(unittest.TestCase):
         """
         pp = pool.ProcessPool(WaitingChild, min=1, max=1,
                               timeout_signal=SIGHUP)
-        
+
         def _work(_):
             d = pp.callRemote(First, data=b"ciao", _timeout=1)
             d.addCallback(lambda d: self.fail())
@@ -854,7 +854,7 @@ class TestProcessPool(unittest.TestCase):
         timeout time is correctly handled.
         """
         pp = pool.ProcessPool(WaitingChild, min=1, max=1, timeout=1)
-        
+
         def _work(_):
             d = pp.callRemote(First, data=b"ciao")
             self.assertFailure(d, error.ProcessTerminated)

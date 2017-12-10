@@ -6,7 +6,7 @@ def makeService(options):
     Create the service for the application
     """
     ms = service.MultiService()
-    
+
     from ampoule.pool import ProcessPool
     from ampoule.main import ProcessStarter
     name = options['name']
@@ -20,7 +20,7 @@ def makeService(options):
     recycle = options['recycle']
     childReactor = options['reactor']
     timeout = options['timeout']
-    
+
     starter = ProcessStarter(packages=("twisted", "ampoule"), childReactor=childReactor)
     pp = ProcessPool(child, parent, min, max, name, maxIdle, recycle, starter, timeout)
     svc = AMPouleService(pp, child, ampport, ampinterface)

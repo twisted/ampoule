@@ -19,7 +19,7 @@ class TestAMPProxy(unittest.TestCase):
         """
         Setup the proxy service and the client connection to the proxy
         service in order to run call through them.
-        
+
         Inspiration comes from twisted.test.test_amp
         """
         self.pp = pool.ProcessPool()
@@ -37,7 +37,7 @@ class TestAMPProxy(unittest.TestCase):
         def setClient(_):
             self.client = self.clientFactory.theProto
         return d.addCallback(setClient)
-        
+
     def test_forwardCall(self):
         """
         Test that a call made from a client is correctly forwarded to

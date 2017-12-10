@@ -29,13 +29,13 @@ class MapReducer(child.AMPChild):
     def _call(self, fun, in_, out):
         return defer.maybeDeferred(fun, in_, out
             ).addCallback(lambda _: {'result': out})
-    
+
     @Map.responder
     def map(self, mapper, filename, outdir):
         in_ = filename
         out = outdir.child(filename.basename()).siblingExtension('.map')
         return self._call(mapper, in_, out)
-    
+
     @Reduce.responder
     def reduce(self, reducer, directory):
         in_ = directory.globChildren('*.map')
