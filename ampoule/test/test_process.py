@@ -1,13 +1,12 @@
 
 from signal import SIGHUP
-import math
 import os
 import os.path
-from cStringIO import StringIO as sio
+from io import BytesIO as sio
 import tempfile
 
 from twisted.internet import error, defer, reactor
-from twisted.python import failure, reflect
+from twisted.python import failure
 from twisted.trial import unittest
 from twisted.protocols import amp
 from ampoule import main, child, commands, pool
@@ -49,25 +48,25 @@ class FakeAMP(object):
         self.s.write(data)
 
 class Ping(amp.Command):
-    arguments = [('data', amp.String())]
-    response = [('response', amp.String())]
+    arguments = [(b'data', amp.String())]
+    response = [(b'response', amp.String())]
 
 class Pong(amp.Command):
-    arguments = [('data', amp.String())]
-    response = [('response', amp.String())]
+    arguments = [(b'data', amp.String())]
+    response = [(b'response', amp.String())]
 
 class Pid(amp.Command):
-    response = [('pid', amp.Integer())]
+    response = [(b'pid', amp.Integer())]
 
 class Reactor(amp.Command):
-    response = [('classname', amp.String())]
+    response = [(b'classname', amp.String())]
 
 class NoResponse(amp.Command):
-    arguments = [('arg', amp.String())]
+    arguments = [(b'arg', amp.String())]
     requiresAnswer = False
 
 class GetResponse(amp.Command):
-    response = [("response", amp.String())]
+    response = [(b"response", amp.String())]
 
 class Child(child.AMPChild):
     def ping(self, data):
@@ -94,12 +93,12 @@ class NoResponseChild(child.AMPChild):
 class ReactorChild(child.AMPChild):
     def reactor(self):
         from twisted.internet import reactor
-        return {'classname': reactor.__class__.__name__}
+        return {'classname': reactor.__class__.__name__.encode()}
     Reactor.responder(reactor)
 
 class First(amp.Command):
-    arguments = [('data', amp.String())]
-    response = [('response', amp.String())]
+    arguments = [(b'data', amp.String())]
+    response = [(b'response', amp.String())]
 
 class Second(amp.Command):
     pass
@@ -127,14 +126,17 @@ class BadChild(child.AMPChild):
 
 
 class Write(amp.Command):
-    response = [("response", amp.String())]
-    pass
+    response = [(b"response", amp.String())]
 
 
 class Writer(child.AMPChild):
 
-    def __init__(self, data='hello'):
+    def __init__(self, data=b'hello'):
         child.AMPChild.__init__(self)
+        if isinstance(data, str):
+            # this is passing through sys.argv, argv is unconditionally unicode
+            # on py3; see https://bugs.python.org/issue8776
+            data = data.encode()
         self.data = data
 
     def write(self):
@@ -144,7 +146,7 @@ class Writer(child.AMPChild):
 
 class GetCWD(amp.Command):
 
-    response = [("cwd", amp.String())]
+    response = [(b"cwd", amp.Unicode())]
 
 
 class TempDirChild(child.AMPChild):
@@ -197,12 +199,14 @@ class TestAMPConnector(unittest.TestCase):
         sa = sio()
         ac = self._makeConnector(s, sa)
         
-        for x in xrange(99):
-            ac.childDataReceived(4, str(x))
+        for x in range(99):
+            ac.childDataReceived(4, str(x).encode("ascii"))
         
         ac.processEnded(failure.Failure(error.ProcessDone(0)))
         return ac.finished.addCallback(
-            lambda _: self.assertEqual(sa.getvalue(), ''.join(str(x) for x in xrange(99)))
+            lambda _: self.assertEqual(sa.getvalue(), b''.join(
+                str(x).encode("ascii") for x in range(99)
+            ))
         )
         
     def test_protocol_failing(self):
@@ -226,11 +230,11 @@ class TestAMPConnector(unittest.TestCase):
         """
         s = sio()
         a = FakeAMP(s)
-        STRING = "ciao"
+        STRING = b"ciao"
         BOOT = """\
 import sys, os
 def main(arg):
-    os.write(4, arg)
+    os.write(4, arg.encode("utf-8"))
 main(sys.argv[1])
 """
         starter = main.ProcessStarter(bootstrap=BOOT,
@@ -238,9 +242,6 @@ main(sys.argv[1])
                                       packages=("twisted", "ampoule"))
 
         amp, finished = starter.startPythonProcess(main.AMPConnector(a))
-        def _eb(reason):
-            print reason
-        finished.addErrback(_eb)
         return finished.addCallback(lambda _: self.assertEquals(s.getvalue(), STRING))
     
     def test_failing_deferToProcess(self):
@@ -250,7 +251,7 @@ main(sys.argv[1])
         """
         s = sio()
         a = FakeAMP(s)
-        STRING = "ciao"
+        STRING = b"ciao"
         BOOT = """\
 import sys
 def main(arg):
@@ -271,20 +272,18 @@ main(sys.argv[1])
         """
         s = sio()
         a = FakeAMP(s)
-        STRING = "ciao"
+        STRING = b"ciao"
         BOOT = """\
-import sys, os
+import sys, io, os
 def main():
-    os.write(4, os.getenv("FOOBAR"))
+    with io.open(4, 'w') as f:
+        f.write(os.environ['FOOBAR'])
 main()
 """
         starter = main.ProcessStarter(bootstrap=BOOT,
                                       packages=("twisted", "ampoule"),
                                       env={"FOOBAR": STRING})
         amp, finished = starter.startPythonProcess(main.AMPConnector(a), "I'll be ignored")
-        def _eb(reason):
-            print reason
-        finished.addErrback(_eb)
         return finished.addCallback(lambda _: self.assertEquals(s.getvalue(), STRING))
 
     def test_startAMPProcess(self):
@@ -292,7 +291,7 @@ main()
         Test that you can start an AMP subprocess and that it correctly
         accepts commands and correctly answers them.
         """
-        STRING = "ciao"
+        STRING = b"ciao"
         
         starter = main.ProcessStarter(packages=("twisted", "ampoule"))
         c, finished = starter.startAMPProcess(child.AMPChild)
@@ -334,8 +333,8 @@ main()
         Test that you can start an AMP subprocess and the children can
         call methods on their parent.
         """
-        DATA = "CIAO"
-        APPEND = "123"
+        DATA = b"CIAO"
+        APPEND = b"123"
 
         class Parent(amp.AMP):
             def pong(self, data):
@@ -457,10 +456,10 @@ class TestProcessPool(unittest.TestCase):
         Test that a failing child process is immediately restarted.
         """
         pp = pool.ProcessPool(ampChild=BadChild, min=1)
-        STRING = "DATA"
+        STRING = b"DATA"
         
         def _checks(_):
-            d = pp._finishCallbacks.values()[0]
+            d = next(iter(pp._finishCallbacks.values()))
             pp.doWork(Die).addErrback(lambda _: None)
             return d.addBoth(_checksAgain)
         
@@ -476,8 +475,8 @@ class TestProcessPool(unittest.TestCase):
         """
         Test that the father can use an AMP protocol too.
         """
-        DATA = "CIAO"
-        APPEND = "123"
+        DATA = b"CIAO"
+        APPEND = b"123"
 
         class Parent(amp.AMP):
             def pong(self, data):
@@ -504,7 +503,7 @@ class TestProcessPool(unittest.TestCase):
             return d
         self.addCleanup(cleanupGlobalPool)
 
-        STRING = "CIAOOOO"
+        STRING = b"CIAOOOO"
         d = pool.deferToAMPProcess(commands.Echo, data=STRING)
         d.addCallback(self.assertEquals, {"response": STRING})
         return d
@@ -515,7 +514,7 @@ class TestProcessPool(unittest.TestCase):
         """
         pp = pool.ProcessPool(ampChild=WaitingChild)
         
-        DATA = "foobar"
+        DATA = b"foobar"
 
         def _checks(_):
             d = pp.callRemote(First, data=DATA)
@@ -547,8 +546,8 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             
-            D = "DATA"
-            d = [pp.doWork(First, data=D) for x in xrange(MAX)]
+            D = b"DATA"
+            d = [pp.doWork(First, data=D) for x in range(MAX)]
 
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
@@ -579,8 +578,8 @@ class TestProcessPool(unittest.TestCase):
             self.assertEquals(len(pp.processes), pp.min)
             self.assertEquals(len(pp._finishCallbacks), pp.min)
             
-            D = "DATA"
-            d = [pp.doWork(First, data=D) for x in xrange(MAX)]
+            D = b"DATA"
+            d = [pp.doWork(First, data=D) for x in range(MAX)]
 
             self.assertEquals(pp.started, True)
             self.assertEquals(pp.finished, False)
@@ -601,7 +600,7 @@ class TestProcessPool(unittest.TestCase):
                         self.assertEquals(len(pp.processes), pp.min)
                         self.assertEquals(len(pp._finishCallbacks), pp.min)
                         d.callback(None)
-                    except Exception, e:
+                    except Exception as e:
                         d.errback(e)
                 return pp._pruneProcesses().addCallback(__)
             # just to be shure we are called after the pruner
@@ -670,7 +669,7 @@ class TestProcessPool(unittest.TestCase):
             self.assertTrue(len(s) > MAX)
 
         def _work(_):
-            l = [pp.doWork(Pid) for x in xrange(CALLS)]
+            l = [pp.doWork(Pid) for x in range(CALLS)]
             d = defer.DeferredList(l)
             return d.addCallback(_check)
         d = pp.start()
@@ -727,10 +726,10 @@ class TestProcessPool(unittest.TestCase):
                     packages=("twisted", "ampoule")),
                 ampChild=ReactorChild, min=MIN, max=MAX)
             pp.start()
-            return pp.doWork(Reactor
-                ).addCallback(self.assertEquals, {'classname': "SelectReactor"}
-                ).addCallback(lambda _: pp.stop())
-            
+            return (pp.doWork(Reactor)
+                    .addCallback(self.assertEquals,
+                                 {'classname': b"SelectReactor"})
+                    .addCallback(lambda _: pp.stop()))
         def checkPool(_):
             pp = pool.ProcessPool(
                 starter=main.ProcessStarter(
@@ -738,9 +737,10 @@ class TestProcessPool(unittest.TestCase):
                     packages=("twisted", "ampoule")),
                 ampChild=ReactorChild, min=MIN, max=MAX)
             pp.start()
-            return pp.doWork(Reactor
-                ).addCallback(self.assertEquals, {'classname': "PollReactor"}
-                ).addCallback(lambda _: pp.stop())
+            return (pp.doWork(Reactor)
+                    .addCallback(self.assertEquals,
+                                 {'classname': b"PollReactor"})
+                    .addCallback(lambda _: pp.stop()))
             
         return checkDefault(
             ).addCallback(checkPool)
@@ -754,7 +754,7 @@ class TestProcessPool(unittest.TestCase):
         Test that if we send a command without a required answer we
         actually don't have any problems.
         """
-        DATA = "hello"
+        DATA = b"hello"
         pp = pool.ProcessPool(ampChild=NoResponseChild, min=1, max=1)
 
         def _check(_):
@@ -769,12 +769,12 @@ class TestProcessPool(unittest.TestCase):
             ).addCallback(_check
             ).addCallback(lambda _: pp.stop())
 
-    def test_SupplyChildArgs(self):
+    def test_supplyChildArgs(self):
         """Ensure that arguments for the child constructor are passed in."""
         pp = pool.ProcessPool(Writer, ampChildArgs=['body'], min=0)
         def _check(result):
             return pp.doWork(Write).addCallback(
-            self.assertEquals, {'response': 'body'})
+            self.assertEquals, {'response': b'body'})
 
         return pp.start(
             ).addCallback(_check
@@ -784,7 +784,7 @@ class TestProcessPool(unittest.TestCase):
         pp = pool.ProcessPool(WaitingChild, min=1, max=1)
         
         def _work(_):
-            d = pp.callRemote(First, data="ciao", _timeout=timeout)
+            d = pp.callRemote(First, data=b"ciao", _timeout=timeout)
             self.assertFailure(d, error.ProcessTerminated)
             return d
 
@@ -809,7 +809,7 @@ class TestProcessPool(unittest.TestCase):
         pp = pool.ProcessPool(WaitingChild, min=1, max=1)
 
         def _work(_):
-            d = pp.callRemote(First, data="ciao", _deadline=reactor.seconds())
+            d = pp.callRemote(First, data=b"ciao", _deadline=reactor.seconds())
             self.assertFailure(d, error.ProcessTerminated)
             return d
 
@@ -838,12 +838,10 @@ class TestProcessPool(unittest.TestCase):
                               timeout_signal=SIGHUP)
         
         def _work(_):
-            d = pp.callRemote(First, data="ciao", _timeout=1)
+            d = pp.callRemote(First, data=b"ciao", _timeout=1)
             d.addCallback(lambda d: self.fail())
             text = 'signal %d' % SIGHUP
-            d.addErrback(
-                lambda f: self.assertTrue(text in f.value[0],
-                '"%s" not in "%s"' % (text, f.value[0])))
+            d.addErrback(lambda f: self.assertIn(text, str(f.value)))
             return d
 
         return pp.start(
@@ -858,7 +856,7 @@ class TestProcessPool(unittest.TestCase):
         pp = pool.ProcessPool(WaitingChild, min=1, max=1, timeout=1)
         
         def _work(_):
-            d = pp.callRemote(First, data="ciao")
+            d = pp.callRemote(First, data=b"ciao")
             self.assertFailure(d, error.ProcessTerminated)
             return d
 

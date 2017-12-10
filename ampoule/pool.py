@@ -2,10 +2,11 @@ import time
 import random
 import heapq
 import itertools
+import functools
 import signal
 choice = random.choice
 now = time.time
-count = itertools.count().next
+count = functools.partial(next, itertools.count())
 pop = heapq.heappop
 
 from twisted.internet import defer, task, error
@@ -105,7 +106,7 @@ class ProcessPool(object):
         """
         n = now()
         d = []
-        for child, lastUse in self._lastUsage.iteritems():
+        for child, lastUse in self._lastUsage.items():
             if len(self.processes) > self.min and (n - lastUse) > self.maxIdle:
                 # we are setting lastUse when processing finishes, it
                 # might be processing right now
@@ -364,7 +365,7 @@ class ProcessPool(object):
         l = []
         if self.started:
             
-            for i in xrange(len(self.processes)-self.max):
+            for i in range(len(self.processes)-self.max):
                 l.append(self.stopAWorker())
             while len(self.processes) < self.min:
                 self.startAWorker()

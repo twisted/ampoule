@@ -60,7 +60,7 @@ class AMPouleService(service.Service):
             reactor.callLater(0, self.pool.start)
         except:
             import traceback
-            print traceback.format_exc()
+            print(traceback.format_exc())
 
     def stopService(self):
         service.Service.stopService(self)

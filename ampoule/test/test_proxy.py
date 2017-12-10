@@ -43,7 +43,7 @@ class TestAMPProxy(unittest.TestCase):
         Test that a call made from a client is correctly forwarded to
         the process pool and the result is correctly reported.
         """
-        DATA = "hello"
+        DATA = b"hello"
         return self.client.callRemote(Echo, data=DATA).addCallback(
             self.assertEquals, {'response': DATA}
         )

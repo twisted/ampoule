@@ -29,7 +29,7 @@ class AMPProxy(amp.AMP):
         
         localCd = set(self._commandDispatch.keys())
         childCd = set(self.child._commandDispatch.keys())
-        assert localCd.intersection(childCd) == set(["StartTLS"]), \
+        assert localCd.intersection(childCd) == set([b"StartTLS"]), \
                     "Illegal method overriding in Proxy"
     
     def locateResponder(self, name):

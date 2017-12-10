@@ -30,7 +30,8 @@ def mymap(in_, out):
             aggregation[word] += 1
 
     f = out.open('wb')
-    f.write("\n".join("%s %s" % word_frequency for word_frequency in aggregation.iteritems()))
+    f.write("\n".join("%s %s" % word_frequency
+                      for word_frequency in aggregation.items()))
     f.close()
 
 
@@ -44,7 +45,8 @@ def myreduce(files, out):
             key, freq = line.split()
             aggregation[key] += int(freq)
 
-    sorted_aggregation = sorted(aggregation.iteritems(), key=lambda t: t[1], reverse=True)
+    sorted_aggregation = sorted(aggregation.items(),
+                                key=lambda t: t[1], reverse=True)
     f = out.open('ab')
     f.write("\n".join("%s %s" % word_frequency for word_frequency in sorted_aggregation))
     f.write('\n')

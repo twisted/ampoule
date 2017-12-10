@@ -3,10 +3,10 @@ import sys
 import imp
 import itertools
 
-from zope.interface import implements
+from zope.interface import implementer
 
 from twisted.internet import reactor, protocol, defer, error
-from twisted.python import log, util, reflect
+from twisted.python import log, reflect
 from twisted.protocols import amp
 from twisted.python import runtime
 from twisted.python.compat import set
@@ -50,7 +50,7 @@ class AMPConnector(protocol.ProcessProtocol):
         self.amp = proto
         self.name = name
         if name is None:
-            self.name = gen.next()
+            self.name = next(gen)
 
     def signalProcess(self, signalID):
         """
@@ -142,9 +142,8 @@ def main(reactor, ampChildPath):
 main(sys.argv[-2], sys.argv[-1])
 """ % (TO_CHILD, FROM_CHILD)
 
+@implementer(iampoule.IStarter)
 class ProcessStarter(object):
-
-    implements(iampoule.IStarter)
 
     connectorFactory = AMPConnector
     def __init__(self, bootstrap=BOOTSTRAP, args=(), env={},
