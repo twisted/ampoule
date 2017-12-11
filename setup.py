@@ -14,7 +14,7 @@ try:
     import ampoule
     version = ampoule.__version__
 except ImportError:
-    version = "0.3.0"
+    version = "0.3.1"
 
 install_requires = ["Twisted>=17[tls]"]
 
@@ -22,7 +22,7 @@ description = """A process pool implementation in Twisted Matrix and AMP"""
 long_description = open('README').read()
 
 setup(
-    name = "ampoul3",
+    name = "ampoule",
     author = "Valentino Volonghi",
     author_email = "dialtone@gmail.com",
     maintainer = "Glyph Lefkowitz",
@@ -32,7 +32,7 @@ setup(
     license = "MIT License",
     version=version,
     install_requires=install_requires,
-    url="https://launchpad.net/ampoule",
+    url="https://github.com/glyph/ampoule",
     classifiers = [
         'Development Status :: 4 - Beta',
         'Environment :: Console',

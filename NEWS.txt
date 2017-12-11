@@ -1,3 +1,9 @@
+Ampoule 0.3.1 (2017-12-10)
+==========================
+
+  - Restored to original name after maintenance handover.
+  - Updated home page to new source code location.
+
 Ampoul3 0.3.0 (2017-12-10)
 ==========================
 
