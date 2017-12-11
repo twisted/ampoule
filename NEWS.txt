@@ -3,6 +3,7 @@ Ampoule 0.3.1 (2017-12-10)
 
   - Restored to original name after maintenance handover.
   - Updated home page to new source code location.
+  - Minor python 2 compatibility issue in the tests (introduced in 0.3.0) fixed.
 
 Ampoul3 0.3.0 (2017-12-10)
 ==========================
