@@ -276,7 +276,7 @@ main(sys.argv[1])
         BOOT = """\
 import sys, io, os
 def main():
-    with io.open(4, 'w') as f:
+    with io.open(4, 'w' + ('b' if bytes is str else '')) as f:
         f.write(os.environ['FOOBAR'])
 main()
 """
