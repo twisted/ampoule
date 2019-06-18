@@ -6,3 +6,6 @@ env:
   matrix:
     - TOX_ENV=py27
     - TOX_ENV=py36
+branches:
+  only:
+    - master
