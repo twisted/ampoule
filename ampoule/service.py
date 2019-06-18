@@ -1,5 +1,6 @@
 from twisted.application import service
 from twisted.internet.protocol import ServerFactory
+from ampoule import rpool
 
 def makeService(options):
     """
@@ -41,7 +42,6 @@ class AMPouleService(service.Service):
         Before reactor.run() is called we setup the system.
         """
         service.Service.startService(self)
-        from ampoule import rpool
         from twisted.internet import reactor
 
         try:
