@@ -47,6 +47,10 @@ class FakeAMP(object):
     def dataReceived(self, data):
         self.s.write(data)
 
+class Exit(amp.Command):
+    arguments = []
+    response = []
+
 class Ping(amp.Command):
     arguments = [(b'data', amp.String())]
     response = [(b'response', amp.String())]
@@ -124,6 +128,12 @@ class BadChild(child.AMPChild):
         return {}
     Die.responder(die)
 
+
+class ExitingChild(child.AMPChild):
+    def exit(self):
+        import os
+        os._exit(33)
+    Exit.responder(exit)
 
 class Write(amp.Command):
     response = [(b"response", amp.String())]
@@ -642,6 +652,36 @@ class TestProcessPool(unittest.TestCase):
         d.addCallback(_checks)
         d.addCallback(_checks2)
         return d
+
+    def test_recyclingProcessFails(self):
+        """
+        A process exiting with a non-zero exit code when recycled does not get
+        multiple processes started to replace it.
+        """
+        MAX = 1
+        MIN = 1
+        RECYCLE_AFTER = 1
+        RECYCLE_AFTER = 1
+        pp = pool.ProcessPool(ampChild=ExitingChild, min=MIN, max=MAX, recycleAfter=RECYCLE_AFTER)
+        self.addCleanup(pp.stop)
+
+        def _checks(_):
+            self.assertEquals(pp.started, True)
+            self.assertEquals(pp.finished, False)
+            self.assertEquals(len(pp.processes), pp.min)
+            self.assertEquals(len(pp._finishCallbacks), pp.min)
+            child = list(pp.ready)[0]
+            finished = pp._finishCallbacks[child]
+            return pp.doWork(Exit).addBoth(lambda _: finished)
+
+        def _checks2(_):
+            self.assertEquals(len(pp.processes), pp.max)
+
+        d = pp.start()
+        d.addCallback(_checks)
+        d.addCallback(_checks2)
+        return d
+
 
     def test_recyclingWithQueueOverload(self):
         """

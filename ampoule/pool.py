@@ -134,10 +134,9 @@ class ProcessPool(object):
         """
         Adds the newly created child process to the pool.
         """
-        def restart(child, reason):
-            log.msg("FATAL: Restarting after %s" % (reason,))
+        def fatal(reason, child):
+            log.msg("FATAL: Process exited %s" % (reason,))
             self._pruneProcess(child)
-            return self.startAWorker()
 
         def dieGently(data, child):
             log.msg("STOPPING: '%s'" % (data,))
@@ -146,7 +145,7 @@ class ProcessPool(object):
         self.processes.add(child)
         self.ready.add(child)
         finished.addCallback(dieGently, child
-               ).addErrback(lambda reason: restart(child, reason))
+               ).addErrback(fatal, child)
         self._finishCallbacks[child] = finished
         self._lastUsage[child] = now()
         self._calls[child] = 0
@@ -337,13 +336,6 @@ class ProcessPool(object):
             # Does this even make sense to you?
             ).addErrback(lambda reason: reason.trap(error.ProcessTerminated))
         return self._finishCallbacks[child]
-
-    def _startSomeWorkers(self):
-        """
-        Start a bunch of workers until we reach the max number of them.
-        """
-        if len(self.processes) < self.max:
-            self.startAWorker()
 
     def adjustPoolSize(self, min=None, max=None):
         """
