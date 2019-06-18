@@ -1,6 +1,10 @@
 
 language: python
 
+branches:
+  only:
+    - master
+
 script:
   - tox -e $TOX_ENV
 
@@ -8,12 +12,9 @@ install:
   - pip install tox
 
 matrix:
-  - python: 2.7
-    env: TOX_ENV=py27
-  - python: 3.6
-    env: TOX_ENV=py36
-
-branches:
-  only:
-    - master
+  include:
+    - python: 2.7
+      env: TOX_ENV=py27
+    - python: 3.6
+      env: TOX_ENV=py36
 
