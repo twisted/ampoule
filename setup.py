@@ -35,7 +35,7 @@ setup(
         'Programming Language :: Python',
         'Topic :: System',
     ],
-    packages=["ampoule", "ampoule.test", "twisted"],
+    packages=["ampoule", "ampoule.test"],
     package_data={'twisted': ['plugins/ampoule_plugin.py']},
     use_incremental=True,
     setup_requires=['incremental'],
