@@ -12,8 +12,8 @@ from setuptools import setup
 
 install_requires = ["Twisted>=17[tls]"]
 
-description = """A process pool implementation in Twisted Matrix and AMP"""
-long_description = open('README').read()
+description = """A process pool built on Twisted and AMP."""
+long_description = open('README.md').read()
 
 setup(
     name = "ampoule",
@@ -22,7 +22,9 @@ setup(
     maintainer = "Glyph Lefkowitz",
     maintainer_email = "glyph@twistedmatrix.com",
     description = description,
+    description_content_type='text/markdown',
     long_description = long_description,
+    long_description_content_type='text/markdown',
     license = "MIT License",
     install_requires=install_requires + ['incremental'],
     url="https://github.com/glyph/ampoule",
