@@ -134,8 +134,8 @@ class ProcessPool(object):
         """
         Adds the newly created child process to the pool.
         """
-        def ohno(child, reason):
-            log.msg("FATAL: Processe exited %s" % (reason,))
+        def fatal(reason, child):
+            log.msg("FATAL: Process exited %s" % (reason,))
             self._pruneProcess(child)
 
         def dieGently(data, child):
@@ -145,7 +145,7 @@ class ProcessPool(object):
         self.processes.add(child)
         self.ready.add(child)
         finished.addCallback(dieGently, child
-               ).addErrback(lambda reason: ohno(child, reason))
+               ).addErrback(fatal, child)
         self._finishCallbacks[child] = finished
         self._lastUsage[child] = now()
         self._calls[child] = 0
