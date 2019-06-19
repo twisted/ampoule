@@ -9,16 +9,22 @@ now = time.time
 count = functools.partial(next, itertools.count())
 pop = heapq.heappop
 
+from twisted import logger
 from twisted.internet import defer, task, error
-from twisted.python import log
 
 from ampoule import commands, main
+
+
+
+log = logger.Logger()
+
 
 try:
     DIE = signal.SIGKILL
 except AttributeError:
     # Windows doesn't have SIGKILL, let's just use SIGTERM then
     DIE = signal.SIGTERM
+
 
 class ProcessPool(object):
     """
@@ -135,17 +141,17 @@ class ProcessPool(object):
         Adds the newly created child process to the pool.
         """
         def fatal(reason, child):
-            log.msg("FATAL: Process exited %s" % (reason,))
+            log.error(u'FATAL: Process exited.')
+            log.error(u'\t{r}', r=reason.getErrorMessage())
             self._pruneProcess(child)
 
         def dieGently(data, child):
-            log.msg("STOPPING: '%s'" % (data,))
+            log.info(u'STOPPING: {s}', s=data)
             self._pruneProcess(child)
 
         self.processes.add(child)
         self.ready.add(child)
-        finished.addCallback(dieGently, child
-               ).addErrback(fatal, child)
+        finished.addCallback(dieGently, child).addErrback(fatal, child)
         self._finishCallbacks[child] = finished
         self._lastUsage[child] = now()
         self._calls[child] = 0
@@ -377,15 +383,15 @@ class ProcessPool(object):
         return defer.DeferredList(l).addCallback(_cb)
 
     def dumpStats(self):
-        log.msg("ProcessPool stats:")
-        log.msg('\tworkers: %s' % len(self.processes))
-        log.msg('\ttimeout: %s' % (self.timeout))
-        log.msg('\tparent: %r' % (self.ampParent,))
-        log.msg('\tchild: %r' % (self.ampChild,))
-        log.msg('\tmax idle: %r' % (self.maxIdle,))
-        log.msg('\trecycle after: %r' % (self.recycleAfter,))
-        log.msg('\tProcessStarter:')
-        log.msg('\t\t%r' % (self.starter,))
+        log.info(u'ProcessPool stats:')
+        log.info(u'\tworkers: {w}', w=len(self.processes))
+        log.info(u'\ttimeout: {t}', t=self.timeout)
+        log.info(u'\tparent: {p}', p=self.ampParent)
+        log.info(u'\tchild: {c}', c=self.ampChild)
+        log.info(u'\tmax idle: {i}', i=self.maxIdle)
+        log.info(u'\trecycle after: {r}', r=self.recycleAfter)
+        log.info(u'\tProcessStarter:')
+        log.info(u'\t\t{s}', s=self.starter)
 
 pp = None
 
