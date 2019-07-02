@@ -19,6 +19,17 @@ from ampoule import commands, main
 log = logger.Logger()
 
 
+STATS_TEMPLATE = u"""ProcessPool stats:
+    workers:       {w}
+    timeout:       {t}
+    parent:        {p}
+    child:         {c}
+    max idle:      {i}
+    recycle after: {r}
+    ProcessStarter:
+                   {s}"""
+
+
 try:
     DIE = signal.SIGKILL
 except AttributeError:
@@ -141,8 +152,9 @@ class ProcessPool(object):
         Adds the newly created child process to the pool.
         """
         def fatal(reason, child):
-            log.error(u'FATAL: Process exited.')
-            log.error(u'\t{r}', r=reason.getErrorMessage())
+            log.error(
+                u'FATAL: Process exited.\n\t{r}', r=reason.getErrorMessage()
+            )
             self._pruneProcess(child)
 
         def dieGently(data, child):
@@ -320,8 +332,8 @@ class ProcessPool(object):
         """
         Gently stop a child so that it's not restarted anymore
 
-        @param command: an L{ampoule.child.AmpChild} type object.
-        @type command: L{ampoule.child.AmpChild} or None
+        @param child: an L{ampoule.child.AmpChild} type object.
+        @type child: L{ampoule.child.AmpChild} or None
 
         """
         if child is None:
@@ -383,15 +395,16 @@ class ProcessPool(object):
         return defer.DeferredList(l).addCallback(_cb)
 
     def dumpStats(self):
-        log.info(u'ProcessPool stats:')
-        log.info(u'\tworkers: {w}', w=len(self.processes))
-        log.info(u'\ttimeout: {t}', t=self.timeout)
-        log.info(u'\tparent: {p}', p=self.ampParent)
-        log.info(u'\tchild: {c}', c=self.ampChild)
-        log.info(u'\tmax idle: {i}', i=self.maxIdle)
-        log.info(u'\trecycle after: {r}', r=self.recycleAfter)
-        log.info(u'\tProcessStarter:')
-        log.info(u'\t\t{s}', s=self.starter)
+        log.info(
+            STATS_TEMPLATE,
+            w=len(self.processes),
+            t=self.timeout,
+            p=self.ampParent,
+            c=self.ampChild,
+            i=self.maxIdle,
+            r=self.recycleAfter,
+            s=self.starter
+        )
 
 pp = None
 
