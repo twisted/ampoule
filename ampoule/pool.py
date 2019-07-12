@@ -9,16 +9,33 @@ now = time.time
 count = functools.partial(next, itertools.count())
 pop = heapq.heappop
 
+from twisted import logger
 from twisted.internet import defer, task, error
-from twisted.python import log
 
 from ampoule import commands, main
+
+
+
+log = logger.Logger()
+
+
+STATS_TEMPLATE = u"""ProcessPool stats:
+    workers:       {w}
+    timeout:       {t}
+    parent:        {p}
+    child:         {c}
+    max idle:      {i}
+    recycle after: {r}
+    ProcessStarter:
+                   {s}"""
+
 
 try:
     DIE = signal.SIGKILL
 except AttributeError:
     # Windows doesn't have SIGKILL, let's just use SIGTERM then
     DIE = signal.SIGTERM
+
 
 class ProcessPool(object):
     """
@@ -63,7 +80,7 @@ class ProcessPool(object):
         self.starter = starter
         self.ampChildArgs = tuple(ampChildArgs)
         if starter is None:
-            self.starter = main.ProcessStarter(packages=("twisted", "ampoule"))
+            self.starter = main.ProcessStarter(packages=("twisted",))
         self.ampParent = ampParent
         self.ampChild = ampChild
         if ampChild is None:
@@ -135,17 +152,18 @@ class ProcessPool(object):
         Adds the newly created child process to the pool.
         """
         def fatal(reason, child):
-            log.msg("FATAL: Process exited %s" % (reason,))
+            log.error(
+                u'FATAL: Process exited.\n\t{r}', r=reason.getErrorMessage()
+            )
             self._pruneProcess(child)
 
         def dieGently(data, child):
-            log.msg("STOPPING: '%s'" % (data,))
+            log.info(u'STOPPING: {s}', s=data)
             self._pruneProcess(child)
 
         self.processes.add(child)
         self.ready.add(child)
-        finished.addCallback(dieGently, child
-               ).addErrback(fatal, child)
+        finished.addCallback(dieGently, child).addErrback(fatal, child)
         self._finishCallbacks[child] = finished
         self._lastUsage[child] = now()
         self._calls[child] = 0
@@ -314,8 +332,8 @@ class ProcessPool(object):
         """
         Gently stop a child so that it's not restarted anymore
 
-        @param command: an L{ampoule.child.AmpChild} type object.
-        @type command: L{ampoule.child.AmpChild} or None
+        @param child: an L{ampoule.child.AmpChild} type object.
+        @type child: L{ampoule.child.AmpChild} or None
 
         """
         if child is None:
@@ -377,15 +395,16 @@ class ProcessPool(object):
         return defer.DeferredList(l).addCallback(_cb)
 
     def dumpStats(self):
-        log.msg("ProcessPool stats:")
-        log.msg('\tworkers: %s' % len(self.processes))
-        log.msg('\ttimeout: %s' % (self.timeout))
-        log.msg('\tparent: %r' % (self.ampParent,))
-        log.msg('\tchild: %r' % (self.ampChild,))
-        log.msg('\tmax idle: %r' % (self.maxIdle,))
-        log.msg('\trecycle after: %r' % (self.recycleAfter,))
-        log.msg('\tProcessStarter:')
-        log.msg('\t\t%r' % (self.starter,))
+        log.info(
+            STATS_TEMPLATE,
+            w=len(self.processes),
+            t=self.timeout,
+            p=self.ampParent,
+            c=self.ampChild,
+            i=self.maxIdle,
+            r=self.recycleAfter,
+            s=self.starter
+        )
 
 pp = None
 

@@ -1,7 +1,12 @@
-from twisted.python import log
+from twisted import logger
 from twisted.internet import error
 from twisted.protocols import amp
 from ampoule.commands import Echo, Shutdown, Ping
+
+
+
+log = logger.Logger()
+
 
 class AMPChild(amp.AMP):
     def __init__(self):
@@ -33,7 +38,7 @@ class AMPChild(amp.AMP):
         This method is needed to shutdown the child gently without
         generating an exception.
         """
-        log.msg("Shutdown message received, goodbye.")
+        log.info(u'Shutdown message received, goodbye.')
         self.shutdown = True
         return {}
     Shutdown.responder(shutdown)

@@ -5,13 +5,19 @@ import itertools
 
 from zope.interface import implementer
 
+from twisted import logger
 from twisted.internet import reactor, protocol, defer, error
-from twisted.python import log, reflect
+from twisted.python import reflect
 from twisted.protocols import amp
 from twisted.python import runtime
 from twisted.python.compat import set
 
 from ampoule import iampoule
+
+
+
+log = logger.Logger()
+
 
 gen = itertools.count()
 
@@ -63,7 +69,7 @@ class AMPConnector(protocol.ProcessProtocol):
         return self.transport.signalProcess(signalID)
 
     def connectionMade(self):
-        log.msg("Subprocess %s started." % (self.name,))
+        log.info(u'Subprocess {n} started.', n=self.name)
         self.amp.makeConnection(self)
 
     # Transport
@@ -94,10 +100,10 @@ class AMPConnector(protocol.ProcessProtocol):
 
     def errReceived(self, data):
         for line in data.strip().splitlines():
-            log.msg("FROM %s: %s" % (self.name, line))
+            log.error(u'FROM {n}: {l}', n=self.name, l=line)
 
     def processEnded(self, status):
-        log.msg("Process: %s ended" % (self.name,))
+        log.info(u'Process: {n} ended', n=self.name)
         self.amp.connectionLost(status)
         if status.check(error.ProcessDone):
             self.finished.callback('')
@@ -111,8 +117,15 @@ def main(reactor, ampChildPath):
     from twisted.application import reactors
     reactors.installReactor(reactor)
 
-    from twisted.python import log
-    log.startLogging(sys.stderr)
+    from twisted import logger
+    observer = logger.textFileLogObserver(sys.stderr)
+    logLevelPredicate = logger.LogLevelFilterPredicate(
+        defaultLogLevel=logger.LogLevel.info
+    )
+    filteringObserver = logger.FilteringLogObserver(
+        observer, [logLevelPredicate]
+    )
+    logger.globalLogBeginner.beginLoggingTo([filteringObserver])
 
     from twisted.internet import reactor, stdio
     from twisted.python import reflect, runtime
