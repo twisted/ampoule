@@ -80,7 +80,7 @@ class ProcessPool(object):
         self.starter = starter
         self.ampChildArgs = tuple(ampChildArgs)
         if starter is None:
-            self.starter = main.ProcessStarter(packages=("twisted", "ampoule"))
+            self.starter = main.ProcessStarter(packages=("twisted",))
         self.ampParent = ampParent
         self.ampChild = ampChild
         if ampChild is None:

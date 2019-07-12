@@ -38,10 +38,7 @@ class AMPChild(amp.AMP):
         This method is needed to shutdown the child gently without
         generating an exception.
         """
-        log.info(
-            u'Shutdown message received, goodbye.',
-            log_system=self.__class__.__name__
-        )
+        log.info(u'Shutdown message received, goodbye.')
         self.shutdown = True
         return {}
     Shutdown.responder(shutdown)
