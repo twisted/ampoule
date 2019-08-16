@@ -11,6 +11,7 @@ pop = heapq.heappop
 
 from twisted import logger
 from twisted.internet import defer, task, error
+from twisted.python.failure import Failure
 
 from ampoule import commands, main
 
@@ -241,7 +242,13 @@ class ProcessPool(object):
             cancelCall(timeoutCall)
             cancelCall(deadlineCall)
             self.busy.discard(child)
-            if not die:
+
+            already_dead = (
+                is_error and
+                result.check(error.ProcessTerminated)
+            )
+
+            if not (die or already_dead):
                 # we are not marked to be removed, so add us back to
                 # the ready set and let's see if there's some catching
                 # up to do
