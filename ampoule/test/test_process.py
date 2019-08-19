@@ -118,6 +118,18 @@ class WaitingChild(child.AMPChild):
         return {}
     Second.responder(second)
 
+class HangForever(amp.Command):
+    pass
+
+class TimingOutChild(child.AMPChild):
+    def hang_forever(self):
+        return defer.Deferred()
+    HangForever.responder(hang_forever)
+
+    def ping(self, data):
+        return {'response': data}
+    Ping.responder(ping)
+
 class Die(amp.Command):
     pass
 
@@ -899,6 +911,25 @@ class TestProcessPool(unittest.TestCase):
             d = pp.callRemote(First, data=b"ciao")
             self.assertFailure(d, error.ProcessTerminated)
             return d
+
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(lambda _: pp.stop())
+
+    def test_processRestartAfterTimeout(self):
+        pp = pool.ProcessPool(TimingOutChild, min=1, max=1, timeout=1)
+
+        def _work(_):
+            d1 = pp.callRemote(HangForever)
+            d2 = pp.callRemote(Ping, data=b"hello")
+
+            self.assertFailure(d1, error.ProcessTerminated)
+
+            d2.addCallback(
+                lambda result: self.assertEqual(
+                    result, {"response": b"hello"}))
+
+            return defer.DeferredList([d1, d2])
 
         return pp.start(
             ).addCallback(_work
