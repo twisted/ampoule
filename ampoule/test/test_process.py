@@ -917,6 +917,10 @@ class TestProcessPool(unittest.TestCase):
             ).addCallback(lambda _: pp.stop())
 
     def test_processRestartAfterTimeout(self):
+        """
+        Test that a call that times out doesn't cause all subsequent requests
+        to fail
+        """
         pp = pool.ProcessPool(TimingOutChild, min=1, max=1, timeout=1)
 
         def _work(_):
