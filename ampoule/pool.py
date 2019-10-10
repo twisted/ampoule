@@ -243,12 +243,12 @@ class ProcessPool(object):
             cancelCall(deadlineCall)
             self.busy.discard(child)
 
-            already_dead = (
+            alreadyDead = (
                 is_error and
                 result.check(error.ProcessTerminated)
             )
 
-            if not (die or already_dead):
+            if not (die or alreadyDead):
                 # we are not marked to be removed, so add us back to
                 # the ready set and let's see if there's some catching
                 # up to do

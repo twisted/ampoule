@@ -122,9 +122,9 @@ class HangForever(amp.Command):
     pass
 
 class TimingOutChild(child.AMPChild):
-    def hang_forever(self):
+    def hangForever(self):
         return defer.Deferred()
-    HangForever.responder(hang_forever)
+    HangForever.responder(hangForever)
 
     def ping(self, data):
         return {'response': data}
