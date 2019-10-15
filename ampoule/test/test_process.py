@@ -73,32 +73,32 @@ class GetResponse(amp.Command):
     response = [(b"response", amp.String())]
 
 class Child(child.AMPChild):
+    @Ping.responder
     def ping(self, data):
         return self.callRemote(Pong, data=data)
-    Ping.responder(ping)
 
 class PidChild(child.AMPChild):
+    @Pid.responder
     def pid(self):
         import os
         return {'pid': os.getpid()}
-    Pid.responder(pid)
 
 class NoResponseChild(child.AMPChild):
     _set = False
+    @NoResponse.responder
     def noresponse(self, arg):
         self._set = arg
         return {}
-    NoResponse.responder(noresponse)
 
+    @GetResponse.responder
     def getresponse(self):
         return {"response": self._set}
-    GetResponse.responder(getresponse)
 
 class ReactorChild(child.AMPChild):
+    @Reactor.responder
     def reactor(self):
         from twisted.internet import reactor
         return {'classname': reactor.__class__.__name__.encode()}
-    Reactor.responder(reactor)
 
 class First(amp.Command):
     arguments = [(b'data', amp.String())]
@@ -109,31 +109,44 @@ class Second(amp.Command):
 
 class WaitingChild(child.AMPChild):
     deferred = None
+    @First.responder
     def first(self, data):
         self.deferred = defer.Deferred()
         return self.deferred.addCallback(lambda _: {'response': data})
-    First.responder(first)
+
+    @Second.responder
     def second(self):
         self.deferred.callback('')
         return {}
-    Second.responder(second)
+
+class HangForever(amp.Command):
+    pass
+
+class TimingOutChild(child.AMPChild):
+    @HangForever.responder
+    def hangForever(self):
+        return defer.Deferred()
+
+    @Ping.responder
+    def ping(self, data):
+        return {'response': data}
 
 class Die(amp.Command):
     pass
 
 class BadChild(child.AMPChild):
+    @Die.responder
     def die(self):
         self.shutdown = False
         self.transport.loseConnection()
         return {}
-    Die.responder(die)
 
 
 class ExitingChild(child.AMPChild):
+    @Exit.responder
     def exit(self):
         import os
         os._exit(33)
-    Exit.responder(exit)
 
 class Write(amp.Command):
     response = [(b"response", amp.String())]
@@ -149,9 +162,9 @@ class Writer(child.AMPChild):
             data = data.encode()
         self.data = data
 
+    @Write.responder
     def write(self):
         return {'response': self.data}
-    Write.responder(write)
 
 
 class GetCWD(amp.Command):
@@ -177,9 +190,9 @@ class TempDirChild(child.AMPChild):
         os.chdir('..')
         os.rmdir(cwd)
 
+    @GetCWD.responder
     def getcwd(self):
         return {'cwd': os.getcwd()}
-    GetCWD.responder(getcwd)
 
 
 class TestAMPConnector(unittest.TestCase):
@@ -347,9 +360,9 @@ main()
         APPEND = b"123"
 
         class Parent(amp.AMP):
+            @Pong.responder
             def pong(self, data):
                 return {'response': DATA+APPEND}
-            Pong.responder(pong)
 
         starter = main.ProcessStarter(packages=("twisted", "ampoule"))
 
@@ -489,9 +502,9 @@ class TestProcessPool(unittest.TestCase):
         APPEND = b"123"
 
         class Parent(amp.AMP):
+            @Pong.responder
             def pong(self, data):
                 return {'response': DATA+APPEND}
-            Pong.responder(pong)
 
         pp = pool.ProcessPool(ampChild=Child, ampParent=Parent)
         def _checks(_):
@@ -899,6 +912,29 @@ class TestProcessPool(unittest.TestCase):
             d = pp.callRemote(First, data=b"ciao")
             self.assertFailure(d, error.ProcessTerminated)
             return d
+
+        return pp.start(
+            ).addCallback(_work
+            ).addCallback(lambda _: pp.stop())
+
+    def test_processRestartAfterTimeout(self):
+        """
+        Test that a call that times out doesn't cause all subsequent requests
+        to fail
+        """
+        pp = pool.ProcessPool(TimingOutChild, min=1, max=1, timeout=1)
+
+        def _work(_):
+            d1 = pp.callRemote(HangForever)
+            d2 = pp.callRemote(Ping, data=b"hello")
+
+            self.assertFailure(d1, error.ProcessTerminated)
+
+            d2.addCallback(
+                lambda result: self.assertEqual(
+                    result, {"response": b"hello"}))
+
+            return defer.DeferredList([d1, d2])
 
         return pp.start(
             ).addCallback(_work
