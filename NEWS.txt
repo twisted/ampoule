@@ -1,3 +1,14 @@
+Ampoule 19.12.0 (2019-12-21)
+============================
+
+  - Replace all uses of twisted.python.log with twisted.logger.
+  - Don't return an already-dead worker to the ready pool.
+
+Ampoule 19.6.0 (2019-06-18)
+===========================
+
+  - Fix a process leak when a process exits non-zero on recycling.
+
 Ampoule 0.3.1 (2017-12-10)
 ==========================
 
