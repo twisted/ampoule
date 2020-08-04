@@ -148,12 +148,12 @@ class ProcessPool(object):
         self._calls.pop(child, None)
         self._finishCallbacks.pop(child, None)
 
-    def fatal(self, reason, child)
+    def fatal(self, reason, child):
         log.error(
             u'FATAL: Process exited.\n\t{r}', r=reason.getErrorMessage()
         )
 
-    def dieGently(self, data, child)
+    def dieGently(self, data, child):
         log.info(u'STOPPING: {s}', s=data)
 
     def _addProcess(self, child, finished):
