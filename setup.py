@@ -10,7 +10,7 @@ Distutils/Setuptools installer for AMPoule.
 
 from setuptools import setup
 
-install_requires = ["Twisted>=17[tls]"]
+install_requires = ["Twisted[tls]>=17"]
 
 description = """A process pool built on Twisted and AMP."""
 long_description = open('README.md').read()
