@@ -1,3 +1,9 @@
+Ampoule 22.5.0 (2022-05-23)
+===========================
+
+  - Various packaging metadata fixes to work better with current versions of
+    pip-tools (as well as other packaging tools).
+
 Ampoule 19.12.0 (2019-12-21)
 ============================
 
