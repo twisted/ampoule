@@ -10,7 +10,6 @@ from twisted.internet import reactor, protocol, defer, error
 from twisted.python import reflect
 from twisted.protocols import amp
 from twisted.python import runtime
-from twisted.python.compat import set
 
 from ampoule import iampoule
 
