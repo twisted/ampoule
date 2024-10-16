@@ -28,7 +28,7 @@ setup(
     license = "MIT License",
     python_requires=">=3",
     install_requires=install_requires + ['incremental'],
-    url="https://github.com/glyph/ampoule",
+    url="https://github.com/twisted/ampoule",
     classifiers = [
         'Development Status :: 4 - Beta',
         'Environment :: Console',
