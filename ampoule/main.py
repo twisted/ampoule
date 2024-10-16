@@ -1,6 +1,6 @@
 import os
 import sys
-import imp
+import importlib.util
 import itertools
 
 from zope.interface import implementer
@@ -284,7 +284,7 @@ def spawnProcess(processProtocol, bootstrap, args=(), env={},
 
     pythonpath = []
     for pkg in packages:
-        p = os.path.split(imp.find_module(pkg)[1])[0]
+        p = os.path.split(importlib.util.find_spec(pkg).origin)[0]
         if p.startswith(os.path.join(sys.prefix, 'lib')):
             continue
         pythonpath.append(p)
