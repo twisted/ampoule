@@ -26,6 +26,7 @@ setup(
     long_description = long_description,
     long_description_content_type='text/markdown',
     license = "MIT License",
+    python_requires=">=3",
     install_requires=install_requires + ['incremental'],
     url="https://github.com/glyph/ampoule",
     classifiers = [
