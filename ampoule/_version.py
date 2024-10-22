@@ -7,5 +7,5 @@ Provides ampoule version information.
 
 from incremental import Version
 
-__version__ = Version('ampoule', 22, 5, 0)
+__version__ = Version("ampoule", 24, 10, 0, post=0)
 __all__ = ["__version__"]
